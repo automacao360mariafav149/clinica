@@ -8,6 +8,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from '@/component
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Activity, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import Aurora from '@/components/backgrounds/Aurora';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -44,8 +45,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <Aurora colorStops={["#5227FF", "#7cff67", "#5227FF"]} amplitude={1.2} blend={0.6} speed={1.0} />
+      </div>
+      <div className="w-full max-w-md space-y-8 relative z-10">
         {/* Logo */}
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
