@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
-import { Activity, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import Aurora from '@/components/backgrounds/Aurora';
+import LightRays from '@/components/backgrounds/LightRays';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -47,16 +47,13 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <Aurora colorStops={["#5227FF", "#7cff67", "#5227FF"]} amplitude={1.2} blend={0.6} speed={1.0} />
+        <LightRays raysOrigin="top-center" raysColor="#66c2ff" raysSpeed={1} lightSpread={1.2} rayLength={2.0} fadeDistance={1.2} saturation={1.0} followMouse={true} mouseInfluence={0.08} noiseAmount={0.05} distortion={0.05} />
       </div>
       <div className="w-full max-w-md space-y-8 relative z-10">
         {/* Logo */}
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-            <Activity className="w-10 h-10 text-white" />
-          </div>
+          <img src="/medx-logo.png" alt="MedX" className="w-48 h-48 object-contain drop-shadow-lg" />
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-foreground">MedX</h1>
             <p className="text-muted-foreground mt-1">Sistema de Gestão Médica</p>
           </div>
         </div>

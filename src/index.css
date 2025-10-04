@@ -8,7 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Purple/Violet Medical Dashboard Theme */
+    /* MedX Blue Theme */
     --background: 222 47% 11%;
     --foreground: 0 0% 100%;
 
@@ -18,19 +18,19 @@ All colors MUST be HSL.
     --popover: 221 39% 14%;
     --popover-foreground: 0 0% 100%;
 
-    /* Vibrant Purple Primary */
-    --primary: 258 90% 66%;
+    /* Brand Primary (MedX Blue #008efc => hsl(206 100% 49%)) */
+    --primary: 206 100% 49%;
     --primary-foreground: 0 0% 100%;
 
-    /* Deep Violet Secondary */
-    --secondary: 270 50% 40%;
+    /* Secondary (darker blue) */
+    --secondary: 206 70% 40%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 221 39% 20%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    /* Purple Accent */
-    --accent: 270 70% 60%;
+    /* Accent (lighter blue) */
+    --accent: 206 90% 60%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -38,26 +38,26 @@ All colors MUST be HSL.
 
     --border: 221 39% 20%;
     --input: 221 39% 20%;
-    --ring: 258 90% 66%;
+    --ring: 206 100% 49%;
 
     --radius: 0.75rem;
 
     /* Sidebar Dark */
     --sidebar-background: 222 47% 8%;
     --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 258 90% 66%;
+    --sidebar-primary: 206 100% 49%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 221 39% 14%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 221 39% 16%;
-    --sidebar-ring: 258 90% 66%;
+    --sidebar-ring: 206 100% 49%;
 
-    /* Chart colors */
-    --chart-1: 258 90% 66%;
-    --chart-2: 280 80% 56%;
-    --chart-3: 300 70% 50%;
-    --chart-4: 320 80% 60%;
-    --chart-5: 340 75% 55%;
+    /* Chart colors - blue scale */
+    --chart-1: 206 100% 49%;
+    --chart-2: 206 90% 60%;
+    --chart-3: 206 80% 70%;
+    --chart-4: 206 70% 40%;
+    --chart-5: 206 60% 55%;
   }
 }
 
