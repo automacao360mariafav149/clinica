@@ -1,8 +1,15 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useRealtimeList } from '@/hooks/useRealtimeList';
 import { Calendar } from 'lucide-react';
 
 export default function Agenda() {
+  const { data, loading, error } = useRealtimeList<any>({
+    table: 'appointments',
+    order: { column: 'scheduled_at', ascending: true },
+  });
+
   return (
     <DashboardLayout>
       <div className="p-8 space-y-8">
@@ -11,16 +18,32 @@ export default function Agenda() {
           <p className="text-muted-foreground mt-1">Gerencie seus agendamentos</p>
         </div>
 
-        <Card className="bg-card border-border p-12">
-          <div className="flex flex-col items-center justify-center gap-4 text-center">
-            <Calendar className="w-16 h-16 text-primary" />
-            <div>
-              <h3 className="text-xl font-semibold text-foreground">Agenda em Desenvolvimento</h3>
-              <p className="text-muted-foreground mt-2">
-                Interface de calendário estilo Google Calendar será configurada em breve
-              </p>
-            </div>
-          </div>
+        <Card className="bg-card border-border p-6">
+          <Table>
+            <TableCaption>
+              {loading ? 'Carregando…' : error ? `Erro: ${error}` : `${data.length} consulta(s)`}
+            </TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Paciente</TableHead>
+                <TableHead>Médico</TableHead>
+                <TableHead>Data/Hora</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Notas</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>{a.patient_id}</TableCell>
+                  <TableCell>{a.doctor_id ?? '-'}</TableCell>
+                  <TableCell>{new Date(a.scheduled_at).toLocaleString()}</TableCell>
+                  <TableCell>{a.status}</TableCell>
+                  <TableCell>{a.notes ?? '-'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Card>
       </div>
     </DashboardLayout>

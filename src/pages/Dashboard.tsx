@@ -1,13 +1,28 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Calendar, TrendingUp, Clock, Activity, Stethoscope } from 'lucide-react';
+import { useRealtimeList } from '@/hooks/useRealtimeList';
 
 export default function Dashboard() {
+  const today = new Date();
+  const todayISO = today.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Listas mínimas só para obter contagens reativas
+  const { data: appointments } = useRealtimeList<any>({ table: 'appointments' });
+  const { data: patients } = useRealtimeList<any>({ table: 'patients' });
+
   const stats = [
-    { title: 'Consultas Hoje', value: '24', icon: Calendar, trend: '+12%' },
-    { title: 'Pacientes Ativos', value: '1,234', icon: Users, trend: '+8%' },
-    { title: 'Taxa de Ocupação', value: '87%', icon: TrendingUp, trend: '+5%' },
-    { title: 'Tempo Médio', value: '45min', icon: Clock, trend: '-3%' },
+    {
+      title: 'Consultas Hoje',
+      value: String(
+        appointments.filter((a) => (a.scheduled_at ?? '').slice(0, 10) === todayISO).length,
+      ),
+      icon: Calendar,
+      trend: '+0%'
+    },
+    { title: 'Pacientes Ativos', value: String(patients.length), icon: Users, trend: '+0%' },
+    { title: 'Taxa de Ocupação', value: '—', icon: TrendingUp, trend: '+0%' },
+    { title: 'Tempo Médio', value: '—', icon: Clock, trend: '0%' },
   ];
 
   return (
@@ -32,7 +47,7 @@ export default function Dashboard() {
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">{stat.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  <span className={stat.trend.startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                  <span className={String(stat.trend).startsWith('+') ? 'text-green-500' : 'text-red-500'}>
                     {stat.trend}
                   </span>{' '}
                   vs. mês passado

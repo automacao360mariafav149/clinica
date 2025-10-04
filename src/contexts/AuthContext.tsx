@@ -20,16 +20,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function mapSupabaseUserToAppUser(supaUser: SupabaseUser): User {
+async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
+  // Busca perfil por auth_user_id na tabela profiles para obter role e nome
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, role')
+    .eq('auth_user_id', supaUser.id)
+    .maybeSingle();
+
   const metadata = (supaUser.user_metadata || {}) as Record<string, unknown>;
-  const roleFromMetadata = (metadata.role as UserRole | undefined) || 'doctor';
-  const nameFromMetadata = (metadata.name as string | undefined) || supaUser.email || 'Usuário';
+  const fallbackName = (metadata.name as string | undefined) || supaUser.email || 'Usuário';
+  const fallbackRole: UserRole = 'doctor';
 
   return {
     id: supaUser.id,
     email: supaUser.email || '',
-    name: nameFromMetadata,
-    role: roleFromMetadata,
+    name: profile?.name || fallbackName,
+    role: (profile?.role as UserRole | undefined) || fallbackRole,
   };
 }
 
@@ -41,16 +48,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
       if (currentUser) {
-        setUser(mapSupabaseUserToAppUser(currentUser));
+        const mapped = await mapSupabaseUserToAppUser(currentUser);
+        setUser(mapped);
       }
     };
 
     init();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user;
       if (currentUser) {
-        setUser(mapSupabaseUserToAppUser(currentUser));
+        const mapped = await mapSupabaseUserToAppUser(currentUser);
+        setUser(mapped);
       } else {
         setUser(null);
       }
@@ -70,8 +79,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser) {
       throw new Error('Sessão não inicializada');
     }
-    setUser(mapSupabaseUserToAppUser(currentUser));
+    const mapped = await mapSupabaseUserToAppUser(currentUser);
+    setUser(mapped);
   };
+
+  // Assina mudanças do perfil do usuário atual para refletir role/name em tempo real
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('realtime:profiles:self')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `auth_user_id=eq.${user.id}` }, async () => {
+        const { data: session } = await supabase.auth.getSession();
+        const currentUser = session.session?.user;
+        if (currentUser) {
+          const mapped = await mapSupabaseUserToAppUser(currentUser);
+          setUser(mapped);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const logout = () => {
     supabase.auth.signOut().finally(() => setUser(null));
