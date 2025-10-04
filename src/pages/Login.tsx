@@ -9,6 +9,7 @@ import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LightRays from '@/components/backgrounds/LightRays';
+import Particles from '@/components/backgrounds/Particles';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -46,6 +47,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-30">
+        <Particles
+          particleCount={100}
+          particleColor="#5227FF"
+          particleSize={3}
+          speed={0.3}
+          connectionDistance={150}
+          showConnections={true}
+        />
+      </div>
       <div className="absolute inset-0 z-0 pointer-events-none">
         <LightRays raysOrigin="top-center" raysColor="#66c2ff" raysSpeed={1} lightSpread={1.2} rayLength={2.0} fadeDistance={1.2} saturation={1.0} followMouse={true} mouseInfluence={0.08} noiseAmount={0.05} distortion={0.05} />
       </div>

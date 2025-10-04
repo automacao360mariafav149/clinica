@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
+import Particles from '@/components/backgrounds/Particles';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -34,8 +35,18 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-30">
+        <Particles
+          particleCount={100}
+          particleColor="#5227FF"
+          particleSize={3}
+          speed={0.3}
+          connectionDistance={150}
+          showConnections={true}
+        />
+      </div>
+      <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
             <Activity className="w-10 h-10 text-white" />
