@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   BarChart3, 
   Calendar, 
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 
 export const Sidebar = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const menuItems = [
     { 
@@ -79,6 +80,14 @@ export const Sidebar = () => {
     item.roles.includes(user?.role || '')
   );
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
+
   return (
     <div className="h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col">
       {/* Logo */}
@@ -99,12 +108,12 @@ export const Sidebar = () => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
             <span className="text-primary font-semibold text-sm">
-              {user?.name.charAt(0).toUpperCase()}
+              {(user?.name?.charAt(0) || '').toUpperCase()}
             </span>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-sidebar-foreground">{user?.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+            <p className="text-sm font-medium text-sidebar-foreground">{user?.name ?? ''}</p>
+            <p className="text-xs text-muted-foreground capitalize">{user?.role ?? ''}</p>
           </div>
         </div>
       </div>
@@ -134,7 +143,7 @@ export const Sidebar = () => {
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50"
-          onClick={logout}
+          onClick={handleLogout}
         >
           <LogOut className="w-5 h-5" />
           <span className="text-sm font-medium">Sair</span>

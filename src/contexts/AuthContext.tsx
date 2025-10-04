@@ -14,7 +14,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -103,8 +103,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [user?.id]);
 
-  const logout = () => {
-    supabase.auth.signOut().finally(() => setUser(null));
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+    }
   };
 
   return (
