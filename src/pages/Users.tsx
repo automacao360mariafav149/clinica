@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Calendar, Loader2, Trash2, Link, Clock, Globe, Shield, Video, Palette, Bell, Star, Check, X, Plus, CheckCircle } from 'lucide-react';
+import { UserPlus, Calendar, Loader2, Trash2, Link, Clock, Globe, Shield, Video, Palette, Bell, Star, Check, X, Plus, CheckCircle, Edit, User, Mail, Phone, Stethoscope } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
@@ -57,9 +57,21 @@ export default function Users() {
   const [newCalendarName, setNewCalendarName] = useState('');
   const [linkedCalendarId, setLinkedCalendarId] = useState<string | null>(null);
   const [linkingCalendarId, setLinkingCalendarId] = useState<string | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    specialization: '',
+    role: 'doctor' as 'doctor' | 'secretary' | 'owner',
+  });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
+    specialization: '',
     role: 'doctor' as 'doctor' | 'secretary',
     password: '',
   });
@@ -101,16 +113,33 @@ export default function Users() {
         const { error: directError } = await supabase.from('profiles').insert({
           auth_user_id: authData.user.id,
           name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          specialization: formData.specialization,
           role: formData.role,
         });
 
         if (directError) throw directError;
+      } else {
+        // Se a RPC funcionou, atualiza os campos adicionais
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            email: formData.email,
+            phone: formData.phone,
+            specialization: formData.specialization,
+          })
+          .eq('auth_user_id', authData.user.id);
+
+        if (updateError) {
+          console.error('Erro ao atualizar campos adicionais:', updateError);
+        }
       }
 
       toast.success(`${formData.role === 'doctor' ? 'Médico' : 'Secretária'} criado(a) com sucesso!`);
       
       // Reseta o formulário e fecha o dialog
-      setFormData({ name: '', email: '', role: 'doctor', password: '' });
+      setFormData({ name: '', email: '', phone: '', specialization: '', role: 'doctor', password: '' });
       setIsDialogOpen(false);
     } catch (err: any) {
       console.error('Erro ao criar usuário:', err);
@@ -449,6 +478,48 @@ export default function Users() {
     }
   };
 
+  const handleEditClick = (user: any) => {
+    setUserToEdit(user);
+    setEditFormData({
+      name: user.name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      specialization: user.specialization || '',
+      role: user.role,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToEdit) return;
+
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: editFormData.name,
+          email: editFormData.email,
+          phone: editFormData.phone,
+          specialization: editFormData.specialization,
+          role: editFormData.role,
+        })
+        .eq('id', userToEdit.id);
+
+      if (error) throw error;
+
+      toast.success('Usuário atualizado com sucesso!');
+      setIsEditDialogOpen(false);
+      setUserToEdit(null);
+    } catch (err: any) {
+      console.error('Erro ao atualizar usuário:', err);
+      toast.error(err.message || 'Erro ao atualizar usuário');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleDeleteClick = (user: any) => {
     // Proteção: não permite deletar a si mesmo
     if (user.auth_user_id === currentUser?.auth_id) {
@@ -560,19 +631,14 @@ export default function Users() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Senha Temporária</Label>
+                  <Label htmlFor="phone">Telefone</Label>
                   <Input
-                    id="password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                    minLength={6}
+                    id="phone"
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    O usuário receberá um email para redefinir a senha
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -591,6 +657,34 @@ export default function Users() {
                       <SelectItem value="secretary">Secretária</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {formData.role === 'doctor' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="specialization">Especialização</Label>
+                    <Input
+                      id="specialization"
+                      placeholder="Ex: Cardiologista, Pediatra, etc."
+                      value={formData.specialization}
+                      onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha Temporária</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                    minLength={6}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    O usuário receberá um email para redefinir a senha
+                  </p>
                 </div>
 
                 <DialogFooter>
@@ -618,82 +712,151 @@ export default function Users() {
           </Dialog>
         </div>
 
-        <MagicBentoCard contentClassName="p-6">
-          <Table>
-            <TableCaption>
-              {loading ? 'Carregando…' : error ? `Erro: ${error}` : `${data.length} usuário(s)`}
-            </TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Perfil</TableHead>
-                <TableHead>Email/Auth</TableHead>
-                <TableHead>Criado em</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.name}</TableCell>
-                  <TableCell>
-                    <span className="capitalize inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                      {u.role === 'owner' ? 'Dono' : u.role === 'doctor' ? 'Médico' : 'Secretária'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="truncate max-w-[240px]">
-                    {u.auth_user_id ?? 'Sem vínculo'}
-                  </TableCell>
-                  <TableCell>{new Date(u.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {u.role === 'doctor' && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleConfigureSchedule(u.id)}
-                          >
-                            <Calendar className="mr-2 h-4 w-4" />
-                            Configurar Agenda
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleLinkSchedule(u.id)}
-                            disabled={isLinkingSchedule}
-                          >
-                            {isLinkingSchedule ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Vinculando...
-                              </>
-                            ) : (
-                              <>
-                                <Link className="mr-2 h-4 w-4" />
-                                Vincular Agenda
-                              </>
-                            )}
-                          </Button>
-                        </>
-                      )}
-                      {u.role !== 'owner' && u.auth_user_id !== currentUser?.auth_id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteClick(u)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+        {/* Contador de usuários */}
+        <div className="text-sm text-muted-foreground">
+          {loading ? 'Carregando…' : error ? `Erro: ${error}` : `${data.length} usuário(s) encontrado(s)`}
+        </div>
+
+        {/* Grid de Cards de Usuários */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {data.map((u) => (
+            <Card key={u.id} className="transition-all duration-200 hover:shadow-lg">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {/* Avatar */}
+                    <div className={`
+                      flex h-12 w-12 items-center justify-center rounded-full shrink-0
+                      ${u.role === 'owner' ? 'bg-purple-500/10' : u.role === 'doctor' ? 'bg-blue-500/10' : 'bg-green-500/10'}
+                    `}>
+                      <User className={`h-6 w-6 
+                        ${u.role === 'owner' ? 'text-purple-500' : u.role === 'doctor' ? 'text-blue-500' : 'text-green-500'}
+                      `} />
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </MagicBentoCard>
+                    
+                    {/* Nome e Role */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">
+                        {u.name}
+                      </h3>
+                      <Badge 
+                        variant="secondary" 
+                        className={`mt-1
+                          ${u.role === 'owner' ? 'bg-purple-500/10 text-purple-600' : ''}
+                          ${u.role === 'doctor' ? 'bg-blue-500/10 text-blue-600' : ''}
+                          ${u.role === 'secretary' ? 'bg-green-500/10 text-green-600' : ''}
+                        `}
+                      >
+                        {u.role === 'owner' ? 'Dono' : u.role === 'doctor' ? 'Médico' : 'Secretária'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-3 pb-4">
+                {/* Email */}
+                {u.email && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground truncate">{u.email}</span>
+                  </div>
+                )}
+
+                {/* Telefone */}
+                {u.phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">{u.phone}</span>
+                  </div>
+                )}
+
+                {/* Especialização */}
+                {u.specialization && u.role === 'doctor' && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Stethoscope className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">{u.specialization}</span>
+                  </div>
+                )}
+
+                {/* Data de Criação */}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+                  <Clock className="h-3 w-3" />
+                  <span>Criado em {new Date(u.created_at).toLocaleDateString('pt-BR')}</span>
+                </div>
+
+                {/* Botões de Ação */}
+                <div className="flex flex-wrap gap-2 pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditClick(u)}
+                    className="flex-1"
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+
+                  {u.role === 'doctor' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleConfigureSchedule(u.id)}
+                        className="flex-1"
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Agenda
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleLinkSchedule(u.id)}
+                        disabled={isLinkingSchedule}
+                        className="flex-1"
+                      >
+                        {isLinkingSchedule ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Vinculando...
+                          </>
+                        ) : (
+                          <>
+                            <Link className="mr-2 h-4 w-4" />
+                            Vincular
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+
+                  {u.role !== 'owner' && u.auth_user_id !== currentUser?.auth_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(u)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Mensagem quando não há usuários */}
+        {!loading && data.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground text-center">
+                Nenhum usuário encontrado
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Modal de resposta do webhook de vinculação */}
@@ -838,6 +1001,122 @@ export default function Users() {
               Fechar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de edição de usuário */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-primary" />
+              Editar Usuário
+            </DialogTitle>
+            <DialogDescription>
+              Atualize as informações do usuário
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nome Completo</Label>
+              <Input
+                id="edit-name"
+                placeholder="Nome do usuário"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                required
+                disabled={isUpdating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                placeholder="email@exemplo.com"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                disabled={isUpdating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Telefone</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                placeholder="(00) 00000-0000"
+                value={editFormData.phone}
+                onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                disabled={isUpdating}
+              />
+            </div>
+
+            {editFormData.role === 'doctor' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-specialization">Especialização</Label>
+                <Input
+                  id="edit-specialization"
+                  placeholder="Ex: Cardiologista, Pediatra, etc."
+                  value={editFormData.specialization}
+                  onChange={(e) => setEditFormData({ ...editFormData, specialization: e.target.value })}
+                  disabled={isUpdating}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Perfil</Label>
+              <Select
+                value={editFormData.role}
+                onValueChange={(value: 'doctor' | 'secretary' | 'owner') => 
+                  setEditFormData({ ...editFormData, role: value })
+                }
+                disabled={isUpdating || userToEdit?.role === 'owner'}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="doctor">Médico</SelectItem>
+                  <SelectItem value="secretary">Secretária</SelectItem>
+                  {userToEdit?.role === 'owner' && (
+                    <SelectItem value="owner">Dono</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {userToEdit?.role === 'owner' && (
+                <p className="text-xs text-muted-foreground">
+                  Não é possível alterar o perfil de Dono
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsEditDialogOpen(false);
+                  setUserToEdit(null);
+                }}
+                disabled={isUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  'Salvar Alterações'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
