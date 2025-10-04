@@ -56,7 +56,7 @@ export default function Login() {
             <Activity className="w-10 h-10 text-white" />
           </div>
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-foreground">MedClinic</h1>
+            <h1 className="text-3xl font-bold text-foreground">MedX</h1>
             <p className="text-muted-foreground mt-1">Sistema de Gestão Médica</p>
           </div>
         </div>
