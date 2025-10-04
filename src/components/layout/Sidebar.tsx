@@ -91,16 +91,8 @@ export const Sidebar = () => {
   return (
     <div className="h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col">
       {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Activity className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">MedClinic</h1>
-            <p className="text-xs text-muted-foreground">Dashboard</p>
-          </div>
-        </div>
+      <div className="p-6 border-b border-sidebar-border flex justify-center">
+        <img src="/logo-interno.png" alt="MedX" className="w-32 h-32 object-contain" />
       </div>
 
       {/* User Info */}

@@ -40,36 +40,54 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
   });
 }
 
+
 /**
  * Mapeia um usuário do Supabase Auth para o formato da aplicação.
  * SEMPRE busca dados atualizados da tabela profiles para evitar problemas de cache.
  * Não confia em user_metadata que pode estar desatualizado.
+ * Usa RPC para melhor confiabilidade.
  */
 async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
-  // Suporta esquemas com chave em id ou auth_user_id
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('name, role')
-    .or(`id.eq.${supaUser.id},auth_user_id.eq.${supaUser.id}`)
-    .maybeSingle();
+  console.log('[AuthContext] Buscando perfil para usuário:', supaUser.id, supaUser.email);
+  
+  try {
+    // Usa RPC (Remote Procedure Call) que é mais confiável e rápido
+    const rpcPromise = supabase.rpc('get_current_user_profile');
 
-  if (error) {
-    console.error('Erro ao buscar perfil do usuário:', error);
-    throw new Error('Não foi possível carregar os dados do perfil do usuário');
+    const { data: profiles, error } = await withTimeout(
+      rpcPromise,
+      15000, // 15 segundos deve ser suficiente para RPC
+      'Timeout ao buscar perfil do usuário'
+    );
+
+    console.log('[AuthContext] Resposta da RPC:', { profiles, error });
+
+    if (error) {
+      console.error('[AuthContext] Erro ao buscar perfil:', error);
+      throw new Error(`Erro ao buscar perfil: ${error.message}`);
+    }
+
+    // RPC retorna array, pega o primeiro (ou null se vazio)
+    const profile = profiles && profiles.length > 0 ? profiles[0] : null;
+
+    if (!profile) {
+      console.error('[AuthContext] Perfil não encontrado para usuário:', supaUser.id);
+      throw new Error('Seu perfil não foi encontrado no sistema. Entre em contato com o administrador.');
+    }
+
+    console.log('[AuthContext] Perfil encontrado:', profile);
+
+    // Sempre usar dados do banco, nunca do metadata
+    return {
+      id: supaUser.id,
+      email: supaUser.email || '',
+      name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
+      role: (profile as { role?: UserRole }).role || 'doctor',
+    };
+  } catch (error) {
+    console.error('[AuthContext] Exceção ao buscar perfil:', error);
+    throw error;
   }
-
-  if (!profile) {
-    console.error('Perfil não encontrado para o usuário:', supaUser.id);
-    throw new Error('Perfil do usuário não encontrado. Entre em contato com o administrador.');
-  }
-
-  // Sempre usar dados do banco, nunca do metadata
-  return {
-    id: supaUser.id,
-    email: supaUser.email || '',
-    name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
-    role: (profile as { role?: UserRole }).role || 'doctor',
-  };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -98,24 +116,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const init = async () => {
+      console.log('[AuthContext] Inicializando contexto de autenticação...');
       setIsLoading(true);
       try {
         const { data } = await supabase.auth.getSession();
         const currentUser = data.session?.user;
         
         if (currentUser) {
+          console.log('[AuthContext] Sessão encontrada, carregando perfil...');
           try {
             const mapped = await mapSupabaseUserToAppUser(currentUser);
             setUser(mapped);
+            console.log('[AuthContext] Perfil carregado com sucesso');
           } catch (error) {
-            console.error('Erro ao carregar perfil do usuário:', error);
+            console.error('[AuthContext] Erro ao carregar perfil do usuário:', error);
             // Se o perfil não existe ou há erro, fazer logout
             await supabase.auth.signOut();
             setUser(null);
           }
+        } else {
+          console.log('[AuthContext] Nenhuma sessão ativa');
         }
       } catch (error) {
-        console.error('Erro ao inicializar autenticação:', error);
+        console.error('[AuthContext] Erro ao inicializar autenticação:', error);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -125,20 +148,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('[AuthContext] Mudança de estado de autenticação:', event);
       const currentUser = session?.user;
       
       if (currentUser && event !== 'SIGNED_OUT') {
+        console.log('[AuthContext] Usuário autenticado, carregando perfil...');
         try {
           const mapped = await mapSupabaseUserToAppUser(currentUser);
           setUser(mapped);
+          console.log('[AuthContext] Perfil atualizado após mudança de estado');
         } catch (error) {
-          console.error('Erro ao atualizar usuário após mudança de estado:', error);
+          console.error('[AuthContext] Erro ao atualizar usuário após mudança de estado:', error);
           // Fazer logout em caso de erro para evitar estado inconsistente
           await supabase.auth.signOut();
           setUser(null);
         }
       } else {
+        console.log('[AuthContext] Usuário deslogado');
         setUser(null);
       }
     });
@@ -153,28 +179,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
     }
     
-    const { data, error } = await withTimeout(
-      supabase.auth.signInWithPassword({ email, password }),
-      15000,
-      'Tempo esgotado ao autenticar. Verifique sua conexão e tente novamente.'
-    );
+    console.log('[AuthContext] Iniciando login para:', email);
     
-    if (error) {
-      throw new Error(error.message || 'Falha ao autenticar');
-    }
-    
-    const currentUser = data.user;
-    if (!currentUser) {
-      throw new Error('Sessão não inicializada');
-    }
-    
-    // Busca os dados do perfil ANTES de definir o usuário
-    // Isso garante que sempre teremos a role correta
     try {
+      // Autenticação com timeout de 60 segundos (generoso)
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        60000,
+        'Tempo esgotado ao autenticar. Verifique sua conexão e tente novamente.'
+      );
+      
+      if (error) {
+        console.error('[AuthContext] Erro na autenticação:', error);
+        // Mensagens de erro mais amigáveis
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Email ou senha incorretos');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Email não confirmado. Verifique sua caixa de entrada.');
+        } else {
+          throw new Error(error.message || 'Falha ao autenticar');
+        }
+      }
+      
+      const currentUser = data.user;
+      if (!currentUser) {
+        throw new Error('Sessão não inicializada');
+      }
+      
+      console.log('[AuthContext] Autenticação bem-sucedida, buscando perfil...');
+      
+      // Busca os dados do perfil ANTES de definir o usuário
+      // Isso garante que sempre teremos a role correta
       const mapped = await mapSupabaseUserToAppUser(currentUser);
       setUser(mapped);
+      
+      console.log('[AuthContext] Login concluído com sucesso');
     } catch (error) {
-      // Se falhar ao buscar o perfil, fazer logout e propagar o erro
+      console.error('[AuthContext] Erro no login:', error);
+      // Se falhar em qualquer etapa, fazer logout para garantir estado limpo
       await supabase.auth.signOut();
       throw error;
     }
@@ -211,21 +253,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Limpa o usuário imediatamente para melhor UX
       setUser(null);
       
-      // Faz o signOut do Supabase (limpa sessionStorage)
+      // Faz o signOut do Supabase (limpa localStorage)
       await supabase.auth.signOut();
       
-      // Força limpeza de qualquer cache residual
+      // Força limpeza de qualquer cache residual (tanto localStorage quanto sessionStorage)
       if (typeof window !== 'undefined') {
-        // Limpa qualquer item relacionado ao Supabase no sessionStorage
-        const keysToRemove: string[] = [];
+        // Limpa qualquer item relacionado ao Supabase no localStorage
+        const localKeysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('sb-')) {
+            localKeysToRemove.push(key);
+          }
+        }
+        localKeysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        // Também limpa sessionStorage por precaução
+        const sessionKeysToRemove: string[] = [];
         for (let i = 0; i < sessionStorage.length; i++) {
           const key = sessionStorage.key(i);
           if (key && key.startsWith('sb-')) {
-            keysToRemove.push(key);
+            sessionKeysToRemove.push(key);
           }
         }
-        keysToRemove.forEach(key => sessionStorage.removeItem(key));
+        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
       }
+      
+      console.log('Logout realizado com sucesso');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
       // Garante que o usuário seja limpo mesmo em caso de erro

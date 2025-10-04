@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Activity } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import Particles from '@/components/backgrounds/Particles';
@@ -59,11 +59,8 @@ export default function Register() {
       </div>
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-            <Activity className="w-10 h-10 text-white" />
-          </div>
+          <img src="/medx-logo.png" alt="MedX" className="w-32 h-32 object-contain drop-shadow-lg" />
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-foreground">MedClinic</h1>
             <p className="text-muted-foreground mt-1">Criar conta</p>
           </div>
         </div>

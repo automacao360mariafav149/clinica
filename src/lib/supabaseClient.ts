@@ -12,14 +12,15 @@ if (!isSupabaseConfigured) {
   );
 }
 
-// Configuração do Supabase com sessionStorage para evitar cache entre sessões
-// e permitir melhor controle sobre a persistência de dados
+// Configuração do Supabase com localStorage (padrão)
+// Persiste a sessão entre reloads e abas, mas com melhor gerenciamento de cache
 export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
   auth: {
-    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    // Usa localStorage padrão do Supabase para persistir sessão
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   }
 });
 
