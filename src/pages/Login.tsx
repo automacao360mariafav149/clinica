@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +13,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   if (isAuthenticated) {
-    navigate('/dashboard', { replace: true });
-    return null;
+    const roleToRoute: Record<string, string> = {
+      owner: '/dashboard',
+      doctor: '/agenda',
+      secretary: '/agenda',
+    };
+    const defaultRoute = '/agenda';
+    const target = roleToRoute[(user?.role || '')] || defaultRoute;
+    return <Navigate to={target} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,7 +34,7 @@ export default function Login() {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      // Deixa o redirecionamento para o estado autenticado abaixo
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao fazer login');
     } finally {
@@ -100,14 +106,9 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Credenciais de Teste:</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p><strong>Dono:</strong> owner@clinic.com / owner123</p>
-                <p><strong>Médico:</strong> doctor@clinic.com / doctor123</p>
-                <p><strong>Secretária:</strong> secretary@clinic.com / secretary123</p>
-              </div>
+            <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
+              <Link to="/register" className="text-primary">Criar conta</Link>
+              <Link to="/forgot-password" className="text-primary">Esqueci minha senha</Link>
             </div>
           </CardContent>
         </Card>

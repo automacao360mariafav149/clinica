@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+Sempre que for criado um migration ou seed SQL, é obrigatório documentar a finalidade, data de criação e autor da alteração. A documentação deve ser incluída no início do arquivo SQL como comentários, seguindo o padrão:
+
+-- Descrição: <Explique brevemente o objetivo da migration ou seed>
+-- Data: <AAAA-MM-DD>
+-- Autor: <Nome do responsável>
+
+Além disso, sempre salvar e disponibilizar o arquivo SQL correspondente à migration ou seed criada. O SQL deve ser armazenado em um local versionado e de fácil acesso, para que no futuro seja possível replicar o projeto automaticamente utilizando esses scripts.
+
+Os arquivos de migration e seed devem ser nomeados de forma sequencial para facilitar a replicação do sistema, seguindo o padrão:
+- 1º_Migration_<descricao>.sql
+- 2º_Migration_<descricao>.sql
+- 1º_Seed_<descricao>.sql
+- 2º_Seed_<descricao>.sql
+
+Exemplo de documentação no início do arquivo:
+-- Descrição: Criação da tabela de usuários
+-- Data: 2024-06-15
+-- Autor: João Silva
+
+Exemplo de organização:
+- migrations/
+    - 1º_Migration_create_users_table.sql
+    - 2º_Migration_add_email_to_users.sql
+- seeds/
+    - 1º_Seed_initial_users.sql
+    - 2º_Seed_initial_roles.sql
+
+Dessa forma, toda alteração no banco de dados estará documentada, o SQL estará disponível para automação e replicação do projeto, e a ordem de execução ficará clara e padronizada.
+
+

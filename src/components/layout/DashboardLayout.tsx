@@ -16,7 +16,7 @@ export const DashboardLayout = ({ children, requiredRoles }: DashboardLayoutProp
   }
 
   if (requiredRoles && !requiredRoles.includes(user?.role || '')) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/agenda" replace />;
   }
 
   return (

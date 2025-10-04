@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'owner' | 'doctor' | 'secretary';
 
@@ -18,57 +20,61 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users (sem backend)
-const MOCK_USERS: Record<string, User & { password: string }> = {
-  'owner@clinic.com': {
-    id: '1',
-    email: 'owner@clinic.com',
-    password: 'owner123',
-    name: 'Dono da Clínica',
-    role: 'owner',
-  },
-  'doctor@clinic.com': {
-    id: '2',
-    email: 'doctor@clinic.com',
-    password: 'doctor123',
-    name: 'Dr. Silva',
-    role: 'doctor',
-  },
-  'secretary@clinic.com': {
-    id: '3',
-    email: 'secretary@clinic.com',
-    password: 'secretary123',
-    name: 'Secretária Ana',
-    role: 'secretary',
-  },
-};
+function mapSupabaseUserToAppUser(supaUser: SupabaseUser): User {
+  const metadata = (supaUser.user_metadata || {}) as Record<string, unknown>;
+  const roleFromMetadata = (metadata.role as UserRole | undefined) || 'doctor';
+  const nameFromMetadata = (metadata.name as string | undefined) || supaUser.email || 'Usuário';
+
+  return {
+    id: supaUser.id,
+    email: supaUser.email || '',
+    name: nameFromMetadata,
+    role: roleFromMetadata,
+  };
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Recupera usuário do localStorage
-    const storedUser = localStorage.getItem('clinic_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      const currentUser = data.session?.user;
+      if (currentUser) {
+        setUser(mapSupabaseUserToAppUser(currentUser));
+      }
+    };
+
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user;
+      if (currentUser) {
+        setUser(mapSupabaseUserToAppUser(currentUser));
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    const mockUser = MOCK_USERS[email];
-    
-    if (!mockUser || mockUser.password !== password) {
-      throw new Error('Email ou senha incorretos');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      throw new Error(error.message || 'Falha ao autenticar');
     }
-
-    const { password: _, ...userWithoutPassword } = mockUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('clinic_user', JSON.stringify(userWithoutPassword));
+    const currentUser = data.user;
+    if (!currentUser) {
+      throw new Error('Sessão não inicializada');
+    }
+    setUser(mapSupabaseUserToAppUser(currentUser));
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('clinic_user');
+    supabase.auth.signOut().finally(() => setUser(null));
   };
 
   return (

@@ -1,0 +1,117 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, Activity } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+
+export default function Register() {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'owner' | 'doctor' | 'secretary'>('doctor');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role,
+        },
+        emailRedirectTo: window.location.origin + '/login',
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    navigate('/login');
+  };
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+            <Activity className="w-10 h-10 text-white" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-foreground">MedClinic</h1>
+            <p className="text-muted-foreground mt-1">Criar conta</p>
+          </div>
+        </div>
+
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="text-2xl">Cadastro</CardTitle>
+            <CardDescription>Crie sua conta para acessar o sistema</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Perfil</Label>
+                <select
+                  id="role"
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as any)}
+                >
+                  <option value="owner">Dono</option>
+                  <option value="doctor">Médico</option>
+                  <option value="secretary">Secretária</option>
+                </select>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Criando...' : 'Criar conta'}
+              </Button>
+
+              <div className="text-sm text-muted-foreground text-center">
+                Já possui conta? <Link to="/login" className="text-primary">Entrar</Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+
