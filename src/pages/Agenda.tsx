@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { MonthCalendar } from '@/components/calendar/MonthCalendar';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Dialog, 
   DialogContent, 
@@ -23,9 +24,22 @@ interface Appointment {
 }
 
 export default function Agenda() {
+  const { user } = useAuth();
+
+  // Filtra appointments baseado na role do usuário
+  const filters = useMemo(() => {
+    if (user?.role === 'doctor') {
+      // Médico vê apenas seus próprios appointments
+      return [{ column: 'doctor_id', operator: 'eq' as const, value: user.id }];
+    }
+    // Owner e secretary veem todos
+    return undefined;
+  }, [user?.role, user?.id]);
+
   const { data, loading, error } = useRealtimeList<Appointment>({
     table: 'appointments',
     order: { column: 'scheduled_at', ascending: true },
+    filters: filters,
   });
 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -71,7 +85,9 @@ export default function Agenda() {
           <p className="text-muted-foreground mt-1">
             {loading ? 'Carregando agendamentos...' : 
              error ? `Erro ao carregar: ${error}` : 
-             `${data.length} agendamento(s) no total`}
+             user?.role === 'doctor' 
+               ? `${data.length} agendamento(s) seus` 
+               : `${data.length} agendamento(s) no total`}
           </p>
         </div>
 

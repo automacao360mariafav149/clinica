@@ -9,6 +9,7 @@ import WhatsApp from "./pages/WhatsApp";
 import Teleconsulta from "./pages/Teleconsulta";
 import Connections from "./pages/Connections";
 import Users from "./pages/Users";
+import DoctorSchedule from "./pages/DoctorSchedule";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -31,6 +32,7 @@ const App = () => (
       <Route path="/teleconsulta" element={<Teleconsulta />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/users" element={<Users />} />
+      <Route path="/users/:doctorId/schedule" element={<DoctorSchedule />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

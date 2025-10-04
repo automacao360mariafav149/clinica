@@ -7,12 +7,19 @@ type OrderConfig = {
   nullsFirst?: boolean;
 };
 
+type FilterConfig = {
+  column: string;
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in';
+  value: any;
+};
+
 export type UseRealtimeListOptions<T> = {
   table: string;
   schema?: string;
   select?: string;
   order?: OrderConfig;
   limit?: number;
+  filters?: FilterConfig[];
   /** Default primary key. Override if your table uses a different key */
   primaryKey?: keyof T & string;
 };
@@ -24,6 +31,7 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
     select = '*',
     order,
     limit,
+    filters,
     primaryKey = 'id' as keyof T & string,
   } = options;
 
@@ -39,6 +47,13 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
 
     async function fetchInitial() {
       let query = supabase.from(table).select(select, { count: 'exact', head: false });
+
+      // Aplica filtros se fornecidos
+      if (filters && filters.length > 0) {
+        filters.forEach((filter) => {
+          query = query[filter.operator](filter.column, filter.value);
+        });
+      }
 
       if (order) {
         query = query.order(order.column, {
@@ -72,12 +87,56 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
           const next = [...current];
           const pk = primaryKey as string;
 
+          // Função auxiliar para verificar se um item passa pelos filtros
+          const matchesFilters = (item: any) => {
+            if (!filters || filters.length === 0) return true;
+            return filters.every((filter) => {
+              const value = item?.[filter.column];
+              switch (filter.operator) {
+                case 'eq':
+                  return value === filter.value;
+                case 'neq':
+                  return value !== filter.value;
+                case 'gt':
+                  return value > filter.value;
+                case 'gte':
+                  return value >= filter.value;
+                case 'lt':
+                  return value < filter.value;
+                case 'lte':
+                  return value <= filter.value;
+                case 'like':
+                case 'ilike':
+                  return String(value).includes(String(filter.value));
+                case 'is':
+                  return value === filter.value;
+                case 'in':
+                  return Array.isArray(filter.value) && filter.value.includes(value);
+                default:
+                  return true;
+              }
+            });
+          };
+
           if (payload.eventType === 'INSERT') {
-            next.unshift(payload.new as T);
+            // Só adiciona se passar pelos filtros
+            if (matchesFilters(payload.new)) {
+              next.unshift(payload.new as T);
+            }
           } else if (payload.eventType === 'UPDATE') {
             const index = next.findIndex((row: any) => row?.[pk] === (payload.new as any)?.[pk]);
-            if (index !== -1) {
-              next[index] = payload.new as T;
+            if (matchesFilters(payload.new)) {
+              // Se passar pelos filtros, atualiza ou adiciona
+              if (index !== -1) {
+                next[index] = payload.new as T;
+              } else {
+                next.unshift(payload.new as T);
+              }
+            } else {
+              // Se não passar pelos filtros, remove se existir
+              if (index !== -1) {
+                next.splice(index, 1);
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const index = next.findIndex((row: any) => row?.[pk] === (payload.old as any)?.[pk]);
@@ -107,7 +166,7 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [table, schema, select, order?.column, order?.ascending, order?.nullsFirst, limit, primaryKey]);
+  }, [table, schema, select, order?.column, order?.ascending, order?.nullsFirst, limit, primaryKey, filters]);
 
   const count = useMemo(() => data.length, [data]);
 
