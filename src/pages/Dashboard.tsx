@@ -1,5 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MagicBentoGrid, MagicBentoCard } from '@/components/bento/MagicBento';
 import { Users, Calendar, TrendingUp, Clock, Activity, Stethoscope } from 'lucide-react';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
 
@@ -34,40 +35,34 @@ export default function Dashboard() {
           <p className="text-muted-foreground mt-1">Visão geral do desempenho da clínica</p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Stats Grid - Magic Bento */}
+        <MagicBentoGrid>
           {stats.map((stat, index) => (
-            <Card key={index} className="bg-card border-border hover:border-primary/50 transition-all">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
+            <MagicBentoCard key={index} accent={index % 2 === 0 ? 'primary' : 'accent'}>
+              <div className="flex items-start justify-between pb-2">
+                <div className="text-sm font-medium text-muted-foreground">{stat.title}</div>
                 <stat.icon className="w-4 h-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <span className={String(stat.trend).startsWith('+') ? 'text-green-500' : 'text-red-500'}>
-                    {stat.trend}
-                  </span>{' '}
-                  vs. mês passado
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+              <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className={String(stat.trend).startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                  {stat.trend}
+                </span>{' '}
+                vs. mês passado
+              </p>
+            </MagicBentoCard>
           ))}
-        </div>
+        </MagicBentoGrid>
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Horários Mais Procurados */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <MagicBentoCard>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Clock className="w-5 h-5 text-primary" />
-                Horários Mais Procurados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+                <span className="text-lg font-semibold">Horários Mais Procurados</span>
+              </div>
               <div className="space-y-3">
                 {['09:00 - 10:00', '14:00 - 15:00', '16:00 - 17:00', '10:00 - 11:00'].map((time, i) => (
                   <div key={i} className="flex items-center gap-3">
@@ -86,18 +81,16 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </MagicBentoCard>
 
           {/* Consultas por Médico */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <MagicBentoCard>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Stethoscope className="w-5 h-5 text-primary" />
-                Consultas por Médico
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+                <span className="text-lg font-semibold">Consultas por Médico</span>
+              </div>
               <div className="space-y-3">
                 {[
                   { name: 'Dr. Silva', count: 45 },
@@ -121,19 +114,17 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </MagicBentoCard>
         </div>
 
         {/* Pacientes Recentes */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <MagicBentoCard>
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-primary" />
-              Pacientes Recentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+              <span className="text-lg font-semibold">Pacientes Recentes</span>
+            </div>
             <div className="space-y-4">
               {[
                 { name: 'João Silva', date: 'Hoje, 14:30', status: 'Confirmado' },
@@ -159,8 +150,8 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </MagicBentoCard>
       </div>
     </DashboardLayout>
   );

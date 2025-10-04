@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Activity, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -57,7 +58,7 @@ export default function Login() {
         </div>
 
         {/* Login Card */}
-        <Card className="border-border bg-card">
+        <MagicBentoCard>
           <CardHeader>
             <CardTitle className="text-2xl">Entrar</CardTitle>
             <CardDescription>Digite suas credenciais para acessar o sistema</CardDescription>
@@ -111,7 +112,7 @@ export default function Login() {
               <Link to="/forgot-password" className="text-primary">Esqueci minha senha</Link>
             </div>
           </CardContent>
-        </Card>
+        </MagicBentoCard>
       </div>
     </div>
   );

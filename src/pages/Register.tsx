@@ -3,10 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -56,7 +57,7 @@ export default function Register() {
           </div>
         </div>
 
-        <Card className="border-border bg-card">
+        <MagicBentoCard>
           <CardHeader>
             <CardTitle className="text-2xl">Cadastro</CardTitle>
             <CardDescription>Crie sua conta para acessar o sistema</CardDescription>
@@ -108,7 +109,7 @@ export default function Register() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </MagicBentoCard>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/card';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Button } from '@/components/ui/button';
 import { Link2, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { supabase, testConnection } from '@/lib/supabaseClient';
@@ -35,7 +35,7 @@ export default function Connections() {
           <p className="text-muted-foreground mt-1">Integrações e APIs externas</p>
         </div>
 
-        <Card className="bg-card border-border p-12">
+        <MagicBentoCard contentClassName="p-12">
           <div className="flex flex-col items-center justify-center gap-6 text-center">
             <Link2 className="w-16 h-16 text-primary" />
             <div>
@@ -71,7 +71,7 @@ export default function Connections() {
               <p className="text-sm text-muted-foreground max-w-md">{message}</p>
             )}
           </div>
-        </Card>
+        </MagicBentoCard>
       </div>
     </DashboardLayout>
   );

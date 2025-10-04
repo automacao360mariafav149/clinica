@@ -3,10 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export default function ResetPassword() {
           </div>
         </div>
 
-        <Card className="border-border bg-card">
+        <MagicBentoCard>
           <CardHeader>
             <CardTitle className="text-2xl">Nova Senha</CardTitle>
             <CardDescription>Defina uma nova senha para sua conta</CardDescription>
@@ -87,7 +88,7 @@ export default function ResetPassword() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </MagicBentoCard>
       </div>
     </div>
   );

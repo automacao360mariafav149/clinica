@@ -1,5 +1,5 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/card';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
 import { Settings } from 'lucide-react';
@@ -18,7 +18,7 @@ export default function Users() {
           <p className="text-muted-foreground mt-1">Administração de médicos e secretárias</p>
         </div>
 
-        <Card className="bg-card border-border p-6">
+        <MagicBentoCard contentClassName="p-6">
           <Table>
             <TableCaption>
               {loading ? 'Carregando…' : error ? `Erro: ${error}` : `${data.length} usuário(s)`}
@@ -42,7 +42,7 @@ export default function Users() {
               ))}
             </TableBody>
           </Table>
-        </Card>
+        </MagicBentoCard>
       </div>
     </DashboardLayout>
   );

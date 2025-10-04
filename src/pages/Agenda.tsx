@@ -1,5 +1,5 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/card';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
 import { Calendar } from 'lucide-react';
@@ -18,7 +18,7 @@ export default function Agenda() {
           <p className="text-muted-foreground mt-1">Gerencie seus agendamentos</p>
         </div>
 
-        <Card className="bg-card border-border p-6">
+        <MagicBentoCard contentClassName="p-6">
           <Table>
             <TableCaption>
               {loading ? 'Carregando…' : error ? `Erro: ${error}` : `${data.length} consulta(s)`}
@@ -44,7 +44,7 @@ export default function Agenda() {
               ))}
             </TableBody>
           </Table>
-        </Card>
+        </MagicBentoCard>
       </div>
     </DashboardLayout>
   );

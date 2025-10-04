@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -45,7 +46,7 @@ export default function ForgotPassword() {
           </div>
         </div>
 
-        <Card className="border-border bg-card">
+        <MagicBentoCard>
           <CardHeader>
             <CardTitle className="text-2xl">Redefinição de Senha</CardTitle>
             <CardDescription>Informe seu email para receber o link de redefinição</CardDescription>
@@ -78,7 +79,7 @@ export default function ForgotPassword() {
               </div>
             </form>
           </CardContent>
-        </Card>
+        </MagicBentoCard>
       </div>
     </div>
   );

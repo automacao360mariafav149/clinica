@@ -1,5 +1,5 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/card';
+import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { MessageSquare } from 'lucide-react';
 
 export default function Assistant() {
@@ -11,7 +11,7 @@ export default function Assistant() {
           <p className="text-muted-foreground mt-1">Chat inteligente para auxiliar no atendimento</p>
         </div>
 
-        <Card className="bg-card border-border p-12">
+        <MagicBentoCard contentClassName="p-12">
           <div className="flex flex-col items-center justify-center gap-4 text-center">
             <MessageSquare className="w-16 h-16 text-primary" />
             <div>
@@ -21,7 +21,7 @@ export default function Assistant() {
               </p>
             </div>
           </div>
-        </Card>
+        </MagicBentoCard>
       </div>
     </DashboardLayout>
   );
