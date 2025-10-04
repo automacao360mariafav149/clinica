@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'owner' | 'doctor' | 'secretary';
@@ -71,6 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
+    }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       throw new Error(error.message || 'Falha ao autenticar');
