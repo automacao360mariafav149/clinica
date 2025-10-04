@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { 
   Dialog, 
@@ -14,22 +15,36 @@ import {
   DialogTrigger,
   DialogFooter
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserPlus, Calendar, Loader2 } from 'lucide-react';
+import { UserPlus, Calendar, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 
 export default function Users() {
   const navigate = useNavigate();
-  const { data, loading, error, fetchSchedules } = useRealtimeList<any>({
+  const { user: currentUser } = useAuth();
+  const { data, loading, error } = useRealtimeList<any>({
     table: 'profiles',
     order: { column: 'created_at', ascending: false },
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -95,6 +110,69 @@ export default function Users() {
 
   const handleConfigureSchedule = (userId: string) => {
     navigate(`/users/${userId}/schedule`);
+  };
+
+  const handleDeleteClick = (user: any) => {
+    // Proteção: não permite deletar a si mesmo
+    if (user.auth_user_id === currentUser?.auth_id) {
+      toast.error('Você não pode deletar seu próprio usuário');
+      return;
+    }
+
+    // Proteção: não permite deletar outros owners
+    if (user.role === 'owner') {
+      toast.error('Não é possível deletar usuários com perfil de Dono');
+      return;
+    }
+
+    setUserToDelete(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // 1. Deleta o perfil da tabela profiles
+      // Isso também deletará automaticamente os horários (doctor_schedules) devido ao CASCADE
+      const { error: deleteError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userToDelete.id);
+
+      if (deleteError) throw deleteError;
+
+      // 2. Se houver auth_user_id, tenta deletar o usuário do Auth
+      // Nota: Isso pode falhar se não tivermos permissão de Admin API
+      // Mas o perfil já foi deletado, então o usuário não conseguirá mais acessar
+      if (userToDelete.auth_user_id) {
+        try {
+          const { error: authError } = await supabase.auth.admin.deleteUser(
+            userToDelete.auth_user_id
+          );
+          
+          if (authError) {
+            console.warn('Não foi possível deletar usuário do Auth (requer Admin API):', authError);
+            // Não lança erro, pois o perfil já foi deletado
+          }
+        } catch (err) {
+          console.warn('Auth Admin API não disponível:', err);
+          // Continua normalmente, pois o perfil já foi deletado
+        }
+      }
+
+      toast.success(`${userToDelete.role === 'doctor' ? 'Médico' : 'Secretária'} deletado(a) com sucesso!`);
+      
+      // Fecha o dialog e limpa o estado
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+    } catch (err: any) {
+      console.error('Erro ao deletar usuário:', err);
+      toast.error(err.message || 'Erro ao deletar usuário');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -231,16 +309,28 @@ export default function Users() {
                   </TableCell>
                   <TableCell>{new Date(u.created_at).toLocaleDateString('pt-BR')}</TableCell>
                   <TableCell className="text-right">
-                    {u.role === 'doctor' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleConfigureSchedule(u.id)}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        Configurar Agenda
-                      </Button>
-                    )}
+                    <div className="flex justify-end gap-2">
+                      {u.role === 'doctor' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleConfigureSchedule(u.id)}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          Configurar Agenda
+                        </Button>
+                      )}
+                      {u.role !== 'owner' && u.auth_user_id !== currentUser?.auth_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteClick(u)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -248,6 +338,43 @@ export default function Users() {
           </Table>
         </MagicBentoCard>
       </div>
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar o usuário <strong>{userToDelete?.name}</strong>?
+              <br /><br />
+              Esta ação não pode ser desfeita. Todos os dados associados a este usuário serão removidos permanentemente.
+              {userToDelete?.role === 'doctor' && (
+                <>
+                  <br /><br />
+                  <strong>Atenção:</strong> Os horários de trabalho configurados para este médico também serão deletados.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deletando...
+                </>
+              ) : (
+                'Deletar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

@@ -51,18 +51,37 @@ export default function DoctorSchedule() {
 
   // Inicializa os horários locais quando os dados são carregados
   useEffect(() => {
+    if (!doctorId) return;
+
+    // Cria um mapa completo com todos os dias da semana
+    const scheduleMap: Record<number, ScheduleType> = {};
+    
     if (schedules.length > 0) {
-      const scheduleMap: Record<number, ScheduleType> = {};
+      // Se há horários salvos, carrega do banco
       schedules.forEach((schedule) => {
         scheduleMap[schedule.day_of_week] = schedule;
       });
-      setLocalSchedules(scheduleMap);
-    } else {
-      // Inicializa com valores padrão
-      const defaultSchedules: Record<number, ScheduleType> = {};
+      
+      // Preenche dias que não foram configurados ainda com valores padrão
       DAYS_OF_WEEK.forEach((day) => {
-        defaultSchedules[day.value] = {
-          doctor_id: doctorId || '',
+        if (!scheduleMap[day.value]) {
+          scheduleMap[day.value] = {
+            doctor_id: doctorId,
+            day_of_week: day.value,
+            start_time: '08:00',
+            end_time: '18:00',
+            appointment_duration: 30,
+            break_start_time: '12:00',
+            break_end_time: '13:00',
+            is_active: false, // Padrão: inativo para dias não configurados
+          };
+        }
+      });
+    } else if (!loading) {
+      // Se não há horários salvos E já terminou de carregar, inicializa com valores padrão
+      DAYS_OF_WEEK.forEach((day) => {
+        scheduleMap[day.value] = {
+          doctor_id: doctorId,
           day_of_week: day.value,
           start_time: '08:00',
           end_time: '18:00',
@@ -72,9 +91,13 @@ export default function DoctorSchedule() {
           is_active: day.value >= 1 && day.value <= 5, // Segunda a Sexta ativo por padrão
         };
       });
-      setLocalSchedules(defaultSchedules);
     }
-  }, [schedules, doctorId]);
+
+    // Só atualiza se houver dados
+    if (Object.keys(scheduleMap).length > 0) {
+      setLocalSchedules(scheduleMap);
+    }
+  }, [schedules, loading, doctorId]);
 
   const handleScheduleChange = (dayOfWeek: number, field: keyof ScheduleType, value: any) => {
     setLocalSchedules((prev) => ({

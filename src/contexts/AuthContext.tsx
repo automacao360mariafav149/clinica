@@ -5,7 +5,8 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 export type UserRole = 'owner' | 'doctor' | 'secretary';
 
 export interface User {
-  id: string;
+  id: string; // ID do perfil (profiles.id) - usar para doctor_id, patient_id, etc
+  auth_id: string; // ID do Supabase Auth (auth.uid()) - para referência
   email: string;
   name: string;
   role: UserRole;
@@ -78,8 +79,10 @@ async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
     console.log('[AuthContext] Perfil encontrado:', profile);
 
     // Sempre usar dados do banco, nunca do metadata
+    // IMPORTANTE: id = profiles.id (usar para FK), auth_id = auth.uid()
     return {
-      id: supaUser.id,
+      id: (profile as { id?: string }).id || supaUser.id, // ID do perfil na tabela profiles
+      auth_id: supaUser.id, // ID do Supabase Auth
       email: supaUser.email || '',
       name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
       role: (profile as { role?: UserRole }).role || 'doctor',

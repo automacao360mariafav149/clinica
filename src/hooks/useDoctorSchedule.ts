@@ -45,46 +45,38 @@ export function useDoctorSchedule(doctorId: string) {
     }
   };
 
-  // Salva ou atualiza um horário
+  // Salva ou atualiza um horário usando UPSERT
+  // UPSERT = INSERT se não existir, UPDATE se já existir
+  // Baseado na constraint UNIQUE(doctor_id, day_of_week)
   const saveSchedule = async (schedule: DoctorSchedule) => {
     setLoading(true);
     setError(null);
 
     try {
-      if (schedule.id) {
-        // Atualiza existente
-        const { error: updateError } = await supabase
-          .from('doctor_schedules')
-          .update({
-            start_time: schedule.start_time,
-            end_time: schedule.end_time,
-            appointment_duration: schedule.appointment_duration,
-            break_start_time: schedule.break_start_time,
-            break_end_time: schedule.break_end_time,
-            is_active: schedule.is_active,
-          })
-          .eq('id', schedule.id);
+      // Prepara os dados para salvar (sem o ID, pois o UPSERT usa a constraint UNIQUE)
+      const scheduleData = {
+        doctor_id: schedule.doctor_id,
+        day_of_week: schedule.day_of_week,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        appointment_duration: schedule.appointment_duration,
+        break_start_time: schedule.break_start_time || null,
+        break_end_time: schedule.break_end_time || null,
+        is_active: schedule.is_active,
+      };
 
-        if (updateError) throw updateError;
-      } else {
-        // Cria novo
-        const { error: insertError } = await supabase
-          .from('doctor_schedules')
-          .insert({
-            doctor_id: schedule.doctor_id,
-            day_of_week: schedule.day_of_week,
-            start_time: schedule.start_time,
-            end_time: schedule.end_time,
-            appointment_duration: schedule.appointment_duration,
-            break_start_time: schedule.break_start_time,
-            break_end_time: schedule.break_end_time,
-            is_active: schedule.is_active,
-          });
+      // UPSERT: Insere se não existe, atualiza se já existe
+      // O PostgreSQL usa a constraint UNIQUE(doctor_id, day_of_week) para identificar conflitos
+      const { error: upsertError } = await supabase
+        .from('doctor_schedules')
+        .upsert(scheduleData, {
+          onConflict: 'doctor_id,day_of_week', // Identifica conflitos por estas colunas
+          ignoreDuplicates: false, // Não ignora, faz UPDATE
+        });
 
-        if (insertError) throw insertError;
-      }
+      if (upsertError) throw upsertError;
 
-      // Recarrega a lista
+      // Recarrega a lista para pegar os dados atualizados do banco
       await fetchSchedules();
     } catch (err: any) {
       console.error('Erro ao salvar horário:', err);
