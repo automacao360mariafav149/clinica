@@ -30,6 +30,7 @@ const STATUS_COLORS = {
   cancelled: 'bg-red-500',
   completed: 'bg-gray-500',
   pending: 'bg-yellow-500',
+  holiday: 'bg-purple-600',
 };
 
 export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: MonthCalendarProps) {
@@ -155,12 +156,14 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
         {calendarDays.map((calDay, index) => {
           const dayAppointments = getAppointmentsForDay(calDay.date);
           const isTodayDate = isToday(calDay.date);
+          const hasHoliday = dayAppointments.some(apt => apt.status === 'holiday');
+          const holidayName = dayAppointments.find(apt => apt.status === 'holiday')?.patient_id;
 
           return (
             <div
               key={index}
               className={cn(
-                'border-r border-b p-2 min-h-[120px] hover:bg-accent/50 transition-colors cursor-pointer',
+                'border-r border-b p-2 min-h-[120px] hover:bg-accent/50 transition-all cursor-pointer relative',
                 !calDay.isCurrentMonth && 'bg-muted/30',
                 index % 7 === 6 && 'border-r-0'
               )}
@@ -170,9 +173,9 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
                 <div className="flex items-center justify-between mb-1">
                   <span
                     className={cn(
-                      'text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full',
+                      'text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full transition-all',
                       !calDay.isCurrentMonth && 'text-muted-foreground',
-                      isTodayDate && 'bg-primary text-primary-foreground'
+                      isTodayDate && 'bg-primary text-primary-foreground ring-2 ring-primary/20'
                     )}
                   >
                     {calDay.day}
@@ -182,31 +185,55 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
                   )}
                 </div>
 
-                <div className="space-y-1 overflow-y-auto">
-                  {dayAppointments.slice(0, 3).map((apt) => (
-                    <div
-                      key={apt.id}
-                      className={cn(
-                        'text-xs p-1 rounded truncate text-white cursor-pointer hover:opacity-80',
-                        STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAppointmentClick?.(apt);
-                      }}
-                      title={`${new Date(apt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - Paciente: ${apt.patient_id}`}
-                    >
-                      {new Date(apt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      {' - '}
-                      {apt.patient_id}
-                    </div>
-                  ))}
-                  {dayAppointments.length > 3 && (
+                <div className="space-y-1 overflow-y-auto flex-1">
+                  {dayAppointments
+                    .filter(apt => apt.status !== 'holiday') // Remove feriados da lista
+                    .slice(0, 3)
+                    .map((apt) => {
+                      const aptDate = new Date(apt.scheduled_at);
+                      const timeStr = aptDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      
+                      return (
+                        <div
+                          key={apt.id}
+                          className={cn(
+                            'text-xs p-1.5 rounded cursor-pointer transition-all text-white hover:opacity-80',
+                            STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAppointmentClick?.(apt);
+                          }}
+                          title={`${timeStr} - ${apt.patient_id}`}
+                        >
+                          <div className="truncate">
+                            {timeStr} - {apt.patient_id}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {dayAppointments.filter(apt => apt.status !== 'holiday').length > 3 && (
                     <div className="text-xs text-muted-foreground pl-1">
-                      +{dayAppointments.length - 3} mais
+                      +{dayAppointments.filter(apt => apt.status !== 'holiday').length - 3} mais
                     </div>
                   )}
                 </div>
+                
+                {/* Tag minimalista de feriado na parte inferior */}
+                {hasHoliday && calDay.isCurrentMonth && (
+                  <div className="mt-auto pt-1">
+                    <div className="flex items-center justify-center">
+                      <span 
+                        className="text-[9px] font-medium cursor-help relative inline-block"
+                        title={holidayName}
+                      >
+                        <span className="relative bg-gradient-to-r from-[#40ffaa] via-[#4079ff] to-[#40ffaa] bg-[length:200%_auto] bg-clip-text text-transparent animate-shimmer">
+                          Feriado
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -223,7 +250,8 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
               status === 'confirmed' ? 'Confirmado' :
               status === 'cancelled' ? 'Cancelado' :
               status === 'completed' ? 'Concluído' :
-              status === 'pending' ? 'Pendente' : status}</span>
+              status === 'pending' ? 'Pendente' :
+              status === 'holiday' ? 'Feriado' : status}</span>
           </div>
         ))}
       </div>
