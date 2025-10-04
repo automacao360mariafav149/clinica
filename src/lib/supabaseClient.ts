@@ -12,7 +12,16 @@ if (!isSupabaseConfigured) {
   );
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
+// Configuração do Supabase com sessionStorage para evitar cache entre sessões
+// e permitir melhor controle sobre a persistência de dados
+export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
+  auth: {
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
 
 export async function testConnection() {
   const { data, error } = await supabase
