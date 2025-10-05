@@ -8,6 +8,7 @@ import Patients from "./pages/Patients";
 import WhatsApp from "./pages/WhatsApp";
 import Teleconsulta from "./pages/Teleconsulta";
 import Connections from "./pages/Connections";
+import Integration from "./pages/Integration";
 import Users from "./pages/Users";
 import DoctorSchedule from "./pages/DoctorSchedule";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
       <Route path="/whatsapp" element={<WhatsApp />} />
       <Route path="/teleconsulta" element={<Teleconsulta />} />
       <Route path="/connections" element={<Connections />} />
+      <Route path="/integration" element={<Integration />} />
       <Route path="/users" element={<Users />} />
       <Route path="/users/:doctorId/schedule" element={<DoctorSchedule />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

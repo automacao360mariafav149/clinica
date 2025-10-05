@@ -7,10 +7,9 @@ import {
   Users, 
   MessageCircle, 
   Video, 
-  Link2, 
+  Plug,
   Settings,
-  LogOut,
-  Activity
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -63,9 +62,9 @@ export const Sidebar = () => {
       roles: ['owner', 'doctor'] 
     },
     { 
-      path: '/connections', 
-      icon: Link2, 
-      label: 'Conexões', 
+      path: '/integration', 
+      icon: Plug, 
+      label: 'Integração', 
       roles: ['owner'] 
     },
     { 
