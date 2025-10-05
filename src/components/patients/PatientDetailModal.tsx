@@ -13,12 +13,15 @@ import { usePatientData } from '@/hooks/usePatientData';
 import { PatientOverview } from './PatientOverview';
 import { MedicalRecordsList } from './MedicalRecordsList';
 import { MedicalRecordForm } from './MedicalRecordForm';
+import { MedicalRecordViewModal } from './MedicalRecordViewModal';
+import { MedicalHistorySummary } from './MedicalHistorySummary';
 import { AnamnesisForm } from './AnamnesisForm';
 import { ClinicalDataForm } from './ClinicalDataForm';
 import { PatientTimeline } from './PatientTimeline';
 import { FileUploadZone } from './FileUploadZone';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { MedicalRecord } from '@/hooks/usePatientData';
 import {
   User,
   FileText,
@@ -39,6 +42,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
   const [showMedicalRecordForm, setShowMedicalRecordForm] = useState(false);
   const [showAnamnesisForm, setShowAnamnesisForm] = useState(false);
   const [showClinicalDataForm, setShowClinicalDataForm] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null);
   
   const {
     patient,
@@ -121,7 +125,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] p-0">
+      <DialogContent className="max-w-7xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="text-2xl">Prontuário do Paciente</DialogTitle>
           <DialogDescription>
@@ -187,36 +191,53 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
               </TabsList>
             </div>
 
-            <ScrollArea className="h-[calc(90vh-200px)]">
-              <div className="p-6">
-                {/* Overview Tab */}
-                <TabsContent value="overview" className="mt-0">
-                  <PatientOverview
-                    patient={patient}
-                    doctors={doctors}
-                    medicalRecords={medicalRecords}
-                    clinicalData={clinicalData}
-                    examHistory={examHistory}
-                    anamnesis={anamnesis}
-                    onAvatarUpdate={handleAvatarUpdate}
-                  />
-                </TabsContent>
+            {/* Timeline Tab - Sem ScrollArea para permitir scroll horizontal */}
+            {activeTab === 'timeline' ? (
+              <div className="h-[calc(90vh-200px)] flex flex-col overflow-hidden">
+                <div className="w-full h-full overflow-hidden">
+                  <TabsContent value="timeline" className="mt-0 h-full">
+                    <PatientTimeline patientId={patientId} />
+                  </TabsContent>
+                </div>
+              </div>
+            ) : (
+              <ScrollArea className="h-[calc(90vh-200px)]">
+                <div className="p-6">
+                  {/* Overview Tab */}
+                  <TabsContent value="overview" className="mt-0">
+                    <PatientOverview
+                      patient={patient}
+                      doctors={doctors}
+                      medicalRecords={medicalRecords}
+                      clinicalData={clinicalData}
+                      examHistory={examHistory}
+                      anamnesis={anamnesis}
+                      onAvatarUpdate={handleAvatarUpdate}
+                    />
+                  </TabsContent>
 
-                {/* Medical Records Tab */}
-                <TabsContent value="medical-records" className="mt-0">
-                  {showMedicalRecordForm ? (
-                    <MedicalRecordForm
-                      patientId={patientId}
-                      onSuccess={handleMedicalRecordSuccess}
-                      onCancel={() => setShowMedicalRecordForm(false)}
-                    />
-                  ) : (
-                    <MedicalRecordsList
-                      records={medicalRecords}
-                      onAdd={() => setShowMedicalRecordForm(true)}
-                    />
-                  )}
-                </TabsContent>
+                  {/* Medical Records Tab */}
+                  <TabsContent value="medical-records" className="mt-0">
+                   {showMedicalRecordForm ? (
+                     <MedicalRecordForm
+                       patientId={patientId}
+                       onSuccess={handleMedicalRecordSuccess}
+                       onCancel={() => setShowMedicalRecordForm(false)}
+                     />
+                   ) : (
+                     <>
+                       {/* Resumo do Histórico */}
+                       <MedicalHistorySummary records={medicalRecords} />
+                       
+                       {/* Lista de Prontuários */}
+                       <MedicalRecordsList
+                         records={medicalRecords}
+                         onAdd={() => setShowMedicalRecordForm(true)}
+                         onView={(record) => setSelectedRecord(record)}
+                       />
+                     </>
+                   )}
+                 </TabsContent>
 
                 {/* Anamnesis Tab */}
                 <TabsContent value="anamnesis" className="mt-0">
@@ -310,11 +331,6 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                   )}
                 </TabsContent>
 
-                {/* Timeline Tab */}
-                <TabsContent value="timeline" className="mt-0">
-                  <PatientTimeline patientId={patientId} />
-                </TabsContent>
-
                 {/* Attachments Tab */}
                 <TabsContent value="attachments" className="mt-0">
                   <div className="space-y-6">
@@ -343,11 +359,24 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                     )}
                   </div>
                 </TabsContent>
-              </div>
-            </ScrollArea>
+                </div>
+              </ScrollArea>
+            )}
           </Tabs>
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
+         ) : null}
+       </DialogContent>
+
+       {/* Modal de visualização de prontuário */}
+       {selectedRecord && (
+         <MedicalRecordViewModal
+           record={selectedRecord}
+           open={!!selectedRecord}
+           onOpenChange={(open) => {
+             if (!open) setSelectedRecord(null);
+           }}
+           patientName={patient?.name}
+         />
+       )}
+     </Dialog>
+   );
+ }

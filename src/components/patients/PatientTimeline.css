@@ -1,0 +1,300 @@
+/* Container da timeline horizontal */
+.timeline-horizontal-container {
+  animation: fadeIn 0.4s ease-out;
+  overflow: hidden;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Linha horizontal animada */
+.timeline-horizontal-line {
+  animation: lineGrowHorizontal 1s ease-out 0.3s forwards;
+  transform-origin: left;
+  opacity: 0;
+}
+
+@keyframes lineGrowHorizontal {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* Scroll horizontal otimizado */
+.timeline-horizontal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.4) hsl(var(--muted) / 0.3);
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding: 2rem;
+  cursor: grab;
+}
+
+.timeline-horizontal-scroll:active,
+.timeline-horizontal-scroll.active {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.timeline-horizontal-scroll.active * {
+  pointer-events: none;
+}
+
+.timeline-horizontal-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.timeline-horizontal-scroll::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.4);
+  border-radius: 6px;
+  margin: 0 2rem;
+}
+
+.timeline-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.6);
+  border-radius: 6px;
+  transition: background 0.2s;
+  border: 2px solid hsl(var(--background));
+}
+
+.timeline-horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.9);
+}
+
+/* Animação dos itens */
+.timeline-horizontal-item {
+  animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+  transform: translateY(30px) scale(0.8);
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Ícone do evento otimizado */
+.timeline-horizontal-icon {
+  animation: iconBounce 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+@keyframes iconBounce {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(10deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.timeline-horizontal-icon:hover {
+  transform: scale(1.15) translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
+}
+
+/* Efeito pulso no evento mais recente - otimizado */
+.timeline-icon-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  animation: pulseWave 2.5s ease-out infinite;
+  animation-delay: 1s;
+  z-index: -1;
+}
+
+@keyframes pulseWave {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* Tooltip otimizado - posicionamento inteligente */
+.timeline-tooltip {
+  pointer-events: none;
+  max-width: min(380px, calc(100vw - 4rem));
+}
+
+.timeline-horizontal-icon-wrapper:hover .timeline-tooltip {
+  animation: tooltipSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes tooltipSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: auto;
+  }
+}
+
+/* Garantir que tooltip fique acessível */
+.timeline-horizontal-icon-wrapper:hover .timeline-tooltip {
+  pointer-events: auto;
+}
+
+/* Animação do indicador inicial */
+.timeline-horizontal-start {
+  animation: fadeIn 0.4s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+/* Estado vazio melhorado */
+.timeline-empty-state {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Hint de scroll melhorado */
+.timeline-scroll-hint {
+  animation: fadeInBounce 0.6s ease-out 1.5s forwards;
+  opacity: 0;
+}
+
+@keyframes fadeInBounce {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Efeito de brilho ao passar o mouse - otimizado */
+.timeline-horizontal-icon::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    hsl(var(--primary-foreground) / 0.2) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.timeline-horizontal-icon:hover::after {
+  opacity: 1;
+  animation: shimmerRotate 1.5s linear infinite;
+}
+
+@keyframes shimmerRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Melhorar performance */
+.timeline-horizontal-icon,
+.timeline-tooltip,
+.timeline-horizontal-item {
+  will-change: transform, opacity;
+}
+
+/* Responsivo - Mobile otimizado */
+@media (max-width: 768px) {
+  .timeline-horizontal-item {
+    min-width: 120px;
+  }
+  
+  .timeline-horizontal-icon {
+    height: 4rem;
+    width: 4rem;
+  }
+  
+  .timeline-tooltip {
+    width: min(320px, calc(100vw - 2rem)) !important;
+  }
+
+  .timeline-horizontal-start {
+    min-width: 80px;
+  }
+}
+
+/* Sombra suave nos tooltips */
+.timeline-tooltip .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35),
+              0 0 0 1px hsl(var(--primary) / 0.1);
+}
+
+/* Animação das bolinhas do hint */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Garantir que nada saia do container */
+.timeline-horizontal-container * {
+  box-sizing: border-box;
+}
+
+/* Melhorar legibilidade do texto */
+.timeline-tooltip h4 {
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.timeline-tooltip p {
+  line-height: 1.6;
+}
+
+/* Efeito hover no card do tooltip */
+.timeline-tooltip .bg-card {
+  transition: background-color 0.2s ease;
+}
+
+/* Remover pseudo-elementos de sombra que causavam problemas */
