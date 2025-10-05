@@ -104,6 +104,24 @@ export interface MedicalAttachment {
   created_at: string;
 }
 
+export interface AgentExam {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  agent_type: string;
+  consultation_input: any;
+  consultation_output: any;
+  exam_type?: string;
+  exam_result_summary?: string;
+  exam_file_name?: string;
+  exam_analysis_date?: string;
+  consultation_date: string;
+  created_at: string;
+  doctor?: {
+    name: string;
+  };
+}
+
 export interface PatientData {
   patient: Patient | null;
   medicalRecords: MedicalRecord[];
@@ -111,6 +129,7 @@ export interface PatientData {
   clinicalData: ClinicalData[];
   examHistory: ExamHistory[];
   attachments: MedicalAttachment[];
+  agentExams: AgentExam[];
   doctors: any[];
 }
 
@@ -122,6 +141,7 @@ export function usePatientData(patientId: string | null) {
     clinicalData: [],
     examHistory: [],
     attachments: [],
+    agentExams: [],
     doctors: [],
   });
   const [loading, setLoading] = useState(false);
@@ -136,6 +156,7 @@ export function usePatientData(patientId: string | null) {
         clinicalData: [],
         examHistory: [],
         attachments: [],
+        agentExams: [],
         doctors: [],
       });
       return;
@@ -205,6 +226,19 @@ export function usePatientData(patientId: string | null) {
 
       if (attachmentsError) throw attachmentsError;
 
+      // Buscar exames do Agent de Exames
+      const { data: agentExamsData, error: agentExamsError } = await supabase
+        .from('agent_consultations')
+        .select(`
+          *,
+          doctor:profiles!agent_consultations_doctor_id_fkey(name)
+        `)
+        .eq('patient_id', patientId)
+        .eq('agent_type', 'exams') // Plural conforme definido no CHECK constraint
+        .order('consultation_date', { ascending: false });
+
+      if (agentExamsError) throw agentExamsError;
+
       // Buscar médicos relacionados
       const { data: doctorsData, error: doctorsError } = await supabase
         .from('patient_doctors')
@@ -223,6 +257,7 @@ export function usePatientData(patientId: string | null) {
         clinicalData: clinicalDataData || [],
         examHistory: examsData || [],
         attachments: attachmentsData || [],
+        agentExams: agentExamsData || [],
         doctors: doctorsData || [],
       });
     } catch (err: any) {

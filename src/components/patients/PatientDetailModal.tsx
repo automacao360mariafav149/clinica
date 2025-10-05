@@ -9,6 +9,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { usePatientData } from '@/hooks/usePatientData';
 import { PatientOverview } from './PatientOverview';
 import { MedicalRecordsList } from './MedicalRecordsList';
@@ -53,6 +54,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
     clinicalData,
     examHistory,
     attachments,
+    agentExams,
     doctors,
     loading,
     error,
@@ -220,7 +222,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                   className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
                 >
                   <Upload className="h-4 w-4" />
-                  Anexos ({attachments.length})
+                  Anexos ({attachments.length + agentExams.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -373,6 +375,82 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                       folder="attachments"
                       onUploadSuccess={handleFileUploadSuccess}
                     />
+                    
+                    {/* Exames do Agent de Exames */}
+                    {agentExams.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-4 flex items-center gap-2">
+                          <span className="text-orange-500">🔬</span>
+                          Exames Analisados pelo Agent ({agentExams.length})
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {agentExams.map((exam) => (
+                            <div
+                              key={exam.id}
+                              className="border rounded-lg p-4 hover:shadow-md transition-shadow bg-gradient-to-br from-orange-500/5 to-amber-500/5"
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-2 rounded-lg bg-orange-500/10">
+                                    <FileText className="w-4 h-4 text-orange-500" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-sm">
+                                      {exam.exam_file_name || 'Exame Laboratorial'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {exam.exam_type || 'Laboratory'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {exam.exam_result_summary && (
+                                <p className="text-xs text-muted-foreground line-clamp-3 mb-3">
+                                  {exam.exam_result_summary}
+                                </p>
+                              )}
+                              
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>
+                                  {new Date(exam.consultation_date).toLocaleDateString('pt-BR')}
+                                </span>
+                                {exam.doctor && (
+                                  <span className="font-medium">
+                                    Dr(a). {exam.doctor.name}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full mt-3"
+                                onClick={() => {
+                                  // Exibir o conteúdo completo do exame
+                                  const output = exam.consultation_output?.output || 'Análise não disponível';
+                                  const modal = document.createElement('div');
+                                  modal.innerHTML = `
+                                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px;">
+                                      <div style="background: white; border-radius: 8px; max-width: 900px; max-height: 90vh; overflow-y: auto; padding: 24px; position: relative;">
+                                        <button onclick="this.closest('div').parentElement.remove()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+                                        <h2 style="margin-bottom: 16px; font-size: 20px; font-weight: bold;">📋 ${exam.exam_file_name || 'Análise de Exame'}</h2>
+                                        <pre style="white-space: pre-wrap; font-family: system-ui; font-size: 14px; line-height: 1.6;">${output}</pre>
+                                      </div>
+                                    </div>
+                                  `;
+                                  document.body.appendChild(modal);
+                                }}
+                              >
+                                Ver Análise Completa
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Arquivos Anexados Manualmente */}
                     {attachments.length > 0 && (
                       <div>
                         <h3 className="font-semibold mb-4">Arquivos Anexados ({attachments.length})</h3>
@@ -385,6 +463,14 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                             />
                           ))}
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Mensagem quando não há anexos */}
+                    {attachments.length === 0 && agentExams.length === 0 && (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Upload className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>Nenhum anexo ou exame analisado ainda</p>
                       </div>
                     )}
                   </div>
