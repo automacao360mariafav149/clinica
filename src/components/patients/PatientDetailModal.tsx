@@ -1,0 +1,353 @@
+import { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { usePatientData } from '@/hooks/usePatientData';
+import { PatientOverview } from './PatientOverview';
+import { MedicalRecordsList } from './MedicalRecordsList';
+import { MedicalRecordForm } from './MedicalRecordForm';
+import { AnamnesisForm } from './AnamnesisForm';
+import { ClinicalDataForm } from './ClinicalDataForm';
+import { PatientTimeline } from './PatientTimeline';
+import { FileUploadZone } from './FileUploadZone';
+import { supabase } from '@/lib/supabaseClient';
+import { toast } from 'sonner';
+import {
+  User,
+  FileText,
+  Activity,
+  Clock,
+  Clipboard,
+  Upload,
+} from 'lucide-react';
+
+interface PatientDetailModalProps {
+  patientId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDetailModalProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showMedicalRecordForm, setShowMedicalRecordForm] = useState(false);
+  const [showAnamnesisForm, setShowAnamnesisForm] = useState(false);
+  const [showClinicalDataForm, setShowClinicalDataForm] = useState(false);
+  
+  const {
+    patient,
+    medicalRecords,
+    anamnesis,
+    clinicalData,
+    examHistory,
+    attachments,
+    doctors,
+    loading,
+    error,
+    refetch,
+  } = usePatientData(patientId);
+
+  // Reset ao abrir/fechar modal
+  useEffect(() => {
+    if (open) {
+      setActiveTab('overview');
+      setShowMedicalRecordForm(false);
+      setShowAnamnesisForm(false);
+      setShowClinicalDataForm(false);
+    }
+  }, [open, patientId]);
+
+  const handleAvatarUpdate = async (url: string) => {
+    if (!patientId) return;
+
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .update({ avatar_url: url })
+        .eq('id', patientId);
+
+      if (error) throw error;
+
+      refetch();
+      toast.success('Avatar atualizado!');
+    } catch (error: any) {
+      console.error('Erro ao atualizar avatar:', error);
+      toast.error('Erro ao atualizar avatar');
+    }
+  };
+
+  const handleMedicalRecordSuccess = () => {
+    setShowMedicalRecordForm(false);
+    refetch();
+  };
+
+  const handleAnamnesisSuccess = () => {
+    setShowAnamnesisForm(false);
+    refetch();
+  };
+
+  const handleClinicalDataSuccess = () => {
+    setShowClinicalDataForm(false);
+    refetch();
+  };
+
+  const handleFileUploadSuccess = async (url: string, path: string) => {
+    if (!patientId) return;
+
+    try {
+      // Registrar anexo no banco
+      const { error } = await supabase.from('medical_attachments').insert({
+        patient_id: patientId,
+        file_name: path.split('/').pop() || 'unknown',
+        file_path: path,
+        related_to_type: 'general',
+      });
+
+      if (error) throw error;
+
+      refetch();
+    } catch (error: any) {
+      console.error('Erro ao registrar anexo:', error);
+    }
+  };
+
+  if (!patientId) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl max-h-[90vh] p-0">
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle className="text-2xl">Prontuário do Paciente</DialogTitle>
+          <DialogDescription>
+            {loading ? 'Carregando dados...' : patient?.name || 'Detalhes completos'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center text-destructive">
+            <p>Erro ao carregar dados: {error}</p>
+          </div>
+        ) : patient ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+            <div className="border-b px-6">
+              <TabsList className="w-full justify-start h-auto p-0 bg-transparent">
+                <TabsTrigger
+                  value="overview"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <User className="h-4 w-4" />
+                  Visão Geral
+                </TabsTrigger>
+                <TabsTrigger
+                  value="medical-records"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <FileText className="h-4 w-4" />
+                  Prontuários ({medicalRecords.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="anamnesis"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <Clipboard className="h-4 w-4" />
+                  Anamnese ({anamnesis.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="clinical-data"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <Activity className="h-4 w-4" />
+                  Dados Clínicos ({clinicalData.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="timeline"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <Clock className="h-4 w-4" />
+                  Linha do Tempo
+                </TabsTrigger>
+                <TabsTrigger
+                  value="attachments"
+                  className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                >
+                  <Upload className="h-4 w-4" />
+                  Anexos ({attachments.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <ScrollArea className="h-[calc(90vh-200px)]">
+              <div className="p-6">
+                {/* Overview Tab */}
+                <TabsContent value="overview" className="mt-0">
+                  <PatientOverview
+                    patient={patient}
+                    doctors={doctors}
+                    medicalRecords={medicalRecords}
+                    clinicalData={clinicalData}
+                    examHistory={examHistory}
+                    anamnesis={anamnesis}
+                    onAvatarUpdate={handleAvatarUpdate}
+                  />
+                </TabsContent>
+
+                {/* Medical Records Tab */}
+                <TabsContent value="medical-records" className="mt-0">
+                  {showMedicalRecordForm ? (
+                    <MedicalRecordForm
+                      patientId={patientId}
+                      onSuccess={handleMedicalRecordSuccess}
+                      onCancel={() => setShowMedicalRecordForm(false)}
+                    />
+                  ) : (
+                    <MedicalRecordsList
+                      records={medicalRecords}
+                      onAdd={() => setShowMedicalRecordForm(true)}
+                    />
+                  )}
+                </TabsContent>
+
+                {/* Anamnesis Tab */}
+                <TabsContent value="anamnesis" className="mt-0">
+                  {showAnamnesisForm ? (
+                    <AnamnesisForm
+                      patientId={patientId}
+                      onSuccess={handleAnamnesisSuccess}
+                      onCancel={() => setShowAnamnesisForm(false)}
+                    />
+                  ) : anamnesis.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setShowAnamnesisForm(true)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          + Nova Anamnese
+                        </button>
+                      </div>
+                      {anamnesis.map((item) => (
+                        <div key={item.id} className="border rounded-lg p-4 space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                            {item.doctor && ` - Dr(a). ${item.doctor.name}`}
+                          </p>
+                          {item.chief_complaint && (
+                            <p className="text-sm">
+                              <strong>Queixa:</strong> {item.chief_complaint}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground mb-4">Nenhuma anamnese registrada</p>
+                      <button
+                        onClick={() => setShowAnamnesisForm(true)}
+                        className="text-primary hover:underline"
+                      >
+                        + Criar primeira anamnese
+                      </button>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Clinical Data Tab */}
+                <TabsContent value="clinical-data" className="mt-0">
+                  {showClinicalDataForm ? (
+                    <ClinicalDataForm
+                      patientId={patientId}
+                      onSuccess={handleClinicalDataSuccess}
+                      onCancel={() => setShowClinicalDataForm(false)}
+                    />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setShowClinicalDataForm(true)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          + Registrar Dados Clínicos
+                        </button>
+                      </div>
+                      {clinicalData.length > 0 ? (
+                        <div className="grid gap-4">
+                          {clinicalData.map((data) => (
+                            <div key={data.id} className="border rounded-lg p-4">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {new Date(data.measurement_date).toLocaleDateString('pt-BR')}
+                              </p>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                {data.weight_kg && <p>Peso: {data.weight_kg}kg</p>}
+                                {data.height_cm && <p>Altura: {data.height_cm}cm</p>}
+                                {data.bmi && <p>IMC: {data.bmi}</p>}
+                                {data.blood_pressure_systolic && data.blood_pressure_diastolic && (
+                                  <p>
+                                    PA: {data.blood_pressure_systolic}/{data.blood_pressure_diastolic}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <p>Nenhum dado clínico registrado</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Timeline Tab */}
+                <TabsContent value="timeline" className="mt-0">
+                  <PatientTimeline patientId={patientId} />
+                </TabsContent>
+
+                {/* Attachments Tab */}
+                <TabsContent value="attachments" className="mt-0">
+                  <div className="space-y-6">
+                    <FileUploadZone
+                      patientId={patientId}
+                      folder="attachments"
+                      onUploadSuccess={handleFileUploadSuccess}
+                    />
+                    {attachments.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-3">Arquivos Anexados</h3>
+                        <div className="space-y-2">
+                          {attachments.map((att) => (
+                            <div key={att.id} className="border rounded-lg p-3 flex items-center gap-3">
+                              <span className="text-2xl">📎</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{att.file_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(att.created_at).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </div>
+            </ScrollArea>
+          </Tabs>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
