@@ -19,9 +19,11 @@ import { AnamnesisForm } from './AnamnesisForm';
 import { ClinicalDataForm } from './ClinicalDataForm';
 import { PatientTimeline } from './PatientTimeline';
 import { FileUploadZone } from './FileUploadZone';
+import { AttachmentCard } from './AttachmentCard';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { MedicalRecord } from '@/hooks/usePatientData';
+import { deleteFile } from '@/lib/storageUtils';
 import {
   User,
   FileText,
@@ -118,6 +120,38 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
       refetch();
     } catch (error: any) {
       console.error('Erro ao registrar anexo:', error);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!patientId) return;
+
+    try {
+      // Buscar o arquivo para deletar do storage
+      const { data: attachment } = await supabase
+        .from('medical_attachments')
+        .select('file_path')
+        .eq('id', attachmentId)
+        .single();
+
+      if (attachment?.file_path) {
+        // Deletar do storage
+        await deleteFile(attachment.file_path);
+      }
+
+      // Deletar do banco de dados
+      const { error } = await supabase
+        .from('medical_attachments')
+        .delete()
+        .eq('id', attachmentId);
+
+      if (error) throw error;
+
+      toast.success('Anexo excluído com sucesso!');
+      refetch();
+    } catch (error: any) {
+      console.error('Erro ao excluir anexo:', error);
+      toast.error('Erro ao excluir anexo');
     }
   };
 
@@ -341,18 +375,14 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                     />
                     {attachments.length > 0 && (
                       <div>
-                        <h3 className="font-semibold mb-3">Arquivos Anexados</h3>
-                        <div className="space-y-2">
+                        <h3 className="font-semibold mb-4">Arquivos Anexados ({attachments.length})</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {attachments.map((att) => (
-                            <div key={att.id} className="border rounded-lg p-3 flex items-center gap-3">
-                              <span className="text-2xl">📎</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{att.file_name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(att.created_at).toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                            </div>
+                            <AttachmentCard
+                              key={att.id}
+                              attachment={att}
+                              onDelete={handleDeleteAttachment}
+                            />
                           ))}
                         </div>
                       </div>
