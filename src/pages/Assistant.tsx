@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileSearch, Calculator, FileText, Microscope, ArrowRight } from 'lucide-react';
+import { FileSearch, Calculator, Microscope, ArrowRight } from 'lucide-react';
 import { AgentCIDModal } from '@/components/assistant/AgentCIDModal';
 import { AgentMedicationModal } from '@/components/assistant/AgentMedicationModal';
 
@@ -28,14 +28,6 @@ export default function Assistant() {
       iconColor: 'text-purple-500',
     },
     {
-      id: 'protocol',
-      title: 'Agent Protocolo Clínico',
-      description: 'Orientações sobre protocolos e diretrizes clínicas atualizadas',
-      icon: FileText,
-      color: 'from-green-500/20 to-emerald-500/20',
-      iconColor: 'text-green-500',
-    },
-    {
       id: 'exams',
       title: 'Agent de Exames',
       description: 'Auxílio na interpretação e solicitação de exames laboratoriais',
@@ -53,7 +45,6 @@ export default function Assistant() {
       case 'medication':
         setMedicationModalOpen(true);
         break;
-      case 'protocol':
       case 'exams':
         console.log(`Agent ${agentId} será configurado posteriormente`);
         break;
@@ -125,6 +116,38 @@ export default function Assistant() {
               💡 Clique em qualquer card para acessar o assistente correspondente. 
               Cada agente será configurado com funcionalidades específicas.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Medical Disclaimer */}
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-6">
+            <h3 className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-3 text-center uppercase tracking-wide">
+              Isenção de Responsabilidade Médica
+            </h3>
+            <div className="text-xs text-muted-foreground space-y-2 leading-relaxed">
+              <p>
+                Estas ferramentas são fornecidas apenas para fins informativos e educacionais.
+              </p>
+              <p>
+                As Ferramentas NÃO:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Constituem aconselhamento médico, diagnóstico ou tratamento</li>
+                <li>Substituem a consulta com profissionais de saúde qualificados</li>
+                <li>Garantem a precisão ou adequação para casos individuais</li>
+                <li>Consideram todas as variáveis clínicas possíveis</li>
+              </ul>
+              <p className="mt-3">
+                O usuário assume total responsabilidade pelo uso das informações 
+                fornecidas. Os desenvolvedores não se responsabilizam por quaisquer 
+                danos diretos, indiretos ou consequenciais resultantes do uso ou 
+                impossibilidade de uso destas Ferramentas.
+              </p>
+              <p className="mt-2 font-medium text-center">
+                Ao utilizar estas Ferramentas, você concorda com estes termos.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
