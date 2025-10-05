@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export interface TimelineEvent {
   id: string;
-  type: 'medical_record' | 'appointment' | 'anamnesis' | 'clinical_data' | 'exam' | 'attachment';
+  type: 'medical_record' | 'appointment' | 'anamnesis' | 'clinical_data' | 'exam' | 'attachment' | 'agent_consultation';
   date: string;
   title: string;
   description?: string;
@@ -162,6 +162,61 @@ export function usePatientTimeline(patientId: string | null) {
           description: att.description || att.file_name,
           icon: 'paperclip',
           data: att,
+        });
+      });
+
+      // Buscar consultas dos agentes de IA
+      const { data: agentConsultations } = await supabase
+        .from('agent_consultations')
+        .select(`
+          id,
+          agent_type,
+          consultation_date,
+          cid_code,
+          cid_description,
+          confidence_level,
+          consultation_input,
+          consultation_output,
+          doctor:profiles!agent_consultations_doctor_id_fkey(name)
+        `)
+        .eq('patient_id', patientId);
+
+      agentConsultations?.forEach((consultation: any) => {
+        let title = 'Consulta de Agente IA';
+        let description = '';
+
+        // Formatar título e descrição baseado no tipo de agente
+        switch (consultation.agent_type) {
+          case 'cid':
+            title = `CID: ${consultation.cid_code || 'Consulta CID'}`;
+            description = consultation.cid_description || 'Consulta de código CID';
+            if (consultation.confidence_level) {
+              description += ` (Confiança: ${consultation.confidence_level})`;
+            }
+            break;
+          case 'medication':
+            title = 'Cálculo de Medicação';
+            description = 'Cálculo de dosagem medicamentosa';
+            break;
+          case 'protocol':
+            title = 'Protocolo Clínico';
+            description = 'Consulta de protocolo clínico';
+            break;
+          case 'exams':
+            title = 'Interpretação de Exames';
+            description = 'Auxílio na interpretação de exames';
+            break;
+        }
+
+        timelineEvents.push({
+          id: consultation.id,
+          type: 'agent_consultation',
+          date: consultation.consultation_date,
+          title,
+          description,
+          doctor: consultation.doctor?.name,
+          icon: 'bot',
+          data: consultation,
         });
       });
 

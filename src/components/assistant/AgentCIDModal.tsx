@@ -177,21 +177,13 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
     setSavingToPatient(true);
 
     try {
-      // Buscar o profile_id do usuário logado
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
+      // user.id já é o profiles.id, conforme definido no AuthContext
       // Salvar a consulta do agente
       const { error: insertError } = await supabase
         .from('agent_consultations')
         .insert({
           patient_id: selectedPatientId,
-          doctor_id: profileData.id,
+          doctor_id: user.id, // user.id já é o profiles.id
           agent_type: 'cid',
           consultation_input: {
             termo,
@@ -204,7 +196,10 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
           confidence_level: resultado.confianca,
         });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Erro ao inserir consulta:', insertError);
+        throw insertError;
+      }
 
       toast.success('Consulta vinculada ao paciente com sucesso!');
       setShowPatientSelect(false);

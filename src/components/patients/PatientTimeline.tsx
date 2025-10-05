@@ -9,7 +9,8 @@ import {
   Clipboard, 
   FileText, 
   Paperclip, 
-  Stethoscope 
+  Stethoscope,
+  Bot
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -84,6 +85,8 @@ export function PatientTimeline({ patientId }: PatientTimelineProps) {
         return <Clipboard className="h-6 w-6" />;
       case 'attachment':
         return <Paperclip className="h-6 w-6" />;
+      case 'agent_consultation':
+        return <Bot className="h-6 w-6" />;
       default:
         return <FileText className="h-6 w-6" />;
     }
@@ -103,6 +106,8 @@ export function PatientTimeline({ patientId }: PatientTimelineProps) {
         return 'Exame';
       case 'attachment':
         return 'Anexo';
+      case 'agent_consultation':
+        return 'Assistente IA';
       default:
         return 'Evento';
     }
