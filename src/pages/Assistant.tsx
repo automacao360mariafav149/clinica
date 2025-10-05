@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { FileSearch, Calculator, FileText, Microscope, ArrowRight } from 'lucide-react';
 import { AgentCIDModal } from '@/components/assistant/AgentCIDModal';
+import { AgentMedicationModal } from '@/components/assistant/AgentMedicationModal';
 
 export default function Assistant() {
   const [cidModalOpen, setCidModalOpen] = useState(false);
+  const [medicationModalOpen, setMedicationModalOpen] = useState(false);
 
   const agents = [
     {
@@ -49,6 +51,8 @@ export default function Assistant() {
         setCidModalOpen(true);
         break;
       case 'medication':
+        setMedicationModalOpen(true);
+        break;
       case 'protocol':
       case 'exams':
         console.log(`Agent ${agentId} será configurado posteriormente`);
@@ -127,6 +131,7 @@ export default function Assistant() {
 
       {/* Modals */}
       <AgentCIDModal open={cidModalOpen} onOpenChange={setCidModalOpen} />
+      <AgentMedicationModal open={medicationModalOpen} onOpenChange={setMedicationModalOpen} />
     </DashboardLayout>
   );
 }
