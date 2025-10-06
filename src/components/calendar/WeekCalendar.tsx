@@ -1,6 +1,7 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface Appointment {
   id: string;
@@ -17,6 +18,7 @@ interface WeekCalendarProps {
   onDateChange: (date: Date) => void;
   onDayClick?: (date: Date) => void;
   onAppointmentClick?: (appointment: Appointment) => void;
+  onEventMoved?: (eventId: string, newDate: Date) => void;
 }
 
 const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -36,8 +38,10 @@ export function WeekCalendar({
   currentDate, 
   onDateChange, 
   onDayClick, 
-  onAppointmentClick 
+  onAppointmentClick,
+  onEventMoved 
 }: WeekCalendarProps) {
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   // Calcular primeiro dia da semana (domingo)
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
@@ -199,6 +203,22 @@ export function WeekCalendar({
                     holiday && 'bg-purple-50 dark:bg-purple-950/20'
                   )}
                   onClick={() => onDayClick?.(day)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const eventId = e.dataTransfer.getData('text/plain');
+                    if (eventId) {
+                      // Criar data com hora do slot atual
+                      const newDate = new Date(day);
+                      newDate.setHours(hour, 0, 0, 0);
+                      onEventMoved?.(eventId, newDate);
+                    }
+                    setDraggingEventId(null);
+                  }}
                 >
                   <div className="space-y-1">
                     {dayAppointments.map((apt) => {
@@ -208,9 +228,19 @@ export function WeekCalendar({
                       return (
                         <div
                           key={apt.id}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', apt.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggingEventId(apt.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingEventId(null);
+                          }}
                           className={cn(
-                            'text-xs p-2 rounded cursor-pointer transition-all text-white shadow-sm',
-                            STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
+                            'text-xs p-2 rounded cursor-move transition-all text-white shadow-sm flex items-start gap-1',
+                            STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500',
+                            draggingEventId === apt.id && 'opacity-50'
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -218,11 +248,14 @@ export function WeekCalendar({
                           }}
                           title={apt.patient_id}
                         >
-                          <div className="font-medium">
-                            {hour.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}
-                          </div>
-                          <div className="truncate opacity-90">
-                            {apt.patient_id}
+                          <GripVertical className="h-3 w-3 flex-shrink-0 opacity-70 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">
+                              {hour.toString().padStart(2, '0')}:{minutes.toString().padStart(2, '0')}
+                            </div>
+                            <div className="truncate opacity-90">
+                              {apt.patient_id}
+                            </div>
                           </div>
                         </div>
                       );

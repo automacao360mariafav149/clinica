@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,7 @@ interface DayCalendarProps {
   onDateChange: (date: Date) => void;
   onTimeSlotClick?: (date: Date) => void;
   onAppointmentClick?: (appointment: Appointment) => void;
+  onEventMoved?: (eventId: string, newDate: Date) => void;
 }
 
 // Gera slots de 30 minutos das 7h às 20h
@@ -47,8 +49,10 @@ export function DayCalendar({
   currentDate, 
   onDateChange, 
   onTimeSlotClick, 
-  onAppointmentClick 
+  onAppointmentClick,
+  onEventMoved 
 }: DayCalendarProps) {
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
 
   // Filtrar appointments por slot de tempo
   const getAppointmentsForTimeSlot = (hour: number, minute: number) => {
@@ -208,6 +212,19 @@ export function DayCalendar({
                     isToday() && !isPast && 'bg-primary/5'
                   )}
                   onClick={() => !holiday && onTimeSlotClick?.(slotDate)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const eventId = e.dataTransfer.getData('text/plain');
+                    if (eventId) {
+                      onEventMoved?.(eventId, slotDate);
+                    }
+                    setDraggingEventId(null);
+                  }}
                 >
                   {slotAppointments.length === 0 ? (
                     <div className="text-sm text-muted-foreground/50 italic">
@@ -222,9 +239,19 @@ export function DayCalendar({
                         return (
                           <div
                             key={apt.id}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', apt.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggingEventId(apt.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingEventId(null);
+                            }}
                             className={cn(
-                              'p-3 rounded-lg cursor-pointer transition-all text-white shadow-md border-l-4',
-                              STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
+                              'p-3 rounded-lg cursor-move transition-all text-white shadow-md border-l-4',
+                              STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500',
+                              draggingEventId === apt.id && 'opacity-50'
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -232,6 +259,7 @@ export function DayCalendar({
                             }}
                           >
                             <div className="flex items-start justify-between gap-3">
+                              <GripVertical className="h-5 w-5 flex-shrink-0 opacity-70 mt-0.5" />
                               <div className="flex-1 min-w-0">
                                 <div className="font-semibold text-base mb-1">
                                   {apt.patient_id}

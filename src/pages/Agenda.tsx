@@ -5,8 +5,10 @@ import { MonthCalendar } from '@/components/calendar/MonthCalendar';
 import { WeekCalendar } from '@/components/calendar/WeekCalendar';
 import { DayCalendar } from '@/components/calendar/DayCalendar';
 import { CreateEventModal } from '@/components/agenda/CreateEventModal';
+import { EditEventModal } from '@/components/agenda/EditEventModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDoctorSchedule, DoctorSchedule as ScheduleType } from '@/hooks/useDoctorSchedule';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   Dialog, 
   DialogContent, 
@@ -21,8 +23,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, User, FileText, Save, Loader2, Filter, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, User, FileText, Save, Loader2, Filter, CalendarDays, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Appointment {
   id: string;
@@ -67,6 +79,15 @@ export default function Agenda() {
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [createEventDate, setCreateEventDate] = useState<Date | undefined>();
   const [createEventStartTime, setCreateEventStartTime] = useState<string | undefined>();
+
+  // Estados para o modal de edição de eventos
+  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<Appointment | null>(null);
+
+  // Estados para o modal de confirmação de exclusão
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<Appointment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Estado para controlar o modo de visualização
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
@@ -279,10 +300,30 @@ export default function Agenda() {
             ? translateHolidayName(event.summary || event.title || event.nome || 'Sem título')
             : event.summary || event.title || event.nome || 'Sem título';
           
+          // Capturar o calendar_id SEMPRE do evento, NUNCA do filtro
+          // Prioridade: calendarId > calendar_id > organizer.email
+          const calendarId = event.calendarId || event.calendar_id || event.organizer?.email || null;
+          
+          // Log para verificar se calendar_id está sendo capturado corretamente
+          if (index === 0) {
+            console.log('[Agenda] 🔍 DEBUG - Exemplo de evento processado:');
+            console.log('  - event.calendarId:', event.calendarId);
+            console.log('  - event.calendar_id:', event.calendar_id);
+            console.log('  - event.organizer?.email:', event.organizer?.email);
+            console.log('  - Calendar ID FINAL:', calendarId);
+            console.log('  - ❌ ALERTA: É "todos"?', calendarId === 'todos');
+          }
+          
+          // Se não conseguiu capturar o calendar_id, pula este evento
+          if (!calendarId || calendarId === 'todos') {
+            console.warn('[Agenda] ⚠️ Evento sem calendar_id válido, será ignorado:', event);
+            return null;
+          }
+          
           return {
             id: event.id || event.eventId || `external-${index}`,
             patient_id: eventName,
-            doctor_id: event.calendarId || event.calendar_id || selectedAgenda,
+            doctor_id: calendarId, // Armazena o calendar_id do Google Calendar (NUNCA "todos")
             scheduled_at: scheduledAt,
             status: isHoliday ? 'holiday' : (event.status === 'confirmed' ? 'confirmed' : 'scheduled'),
             notes: event.description || event.notes || event.descricao || '',
@@ -408,11 +449,36 @@ export default function Agenda() {
 
       const data = await response.json();
       console.log('[Agenda] Dados da agenda recebidos:', data);
+      
+      // Log detalhado do primeiro evento da resposta
+      let firstEvent = null;
+      if (Array.isArray(data) && data.length > 0) {
+        firstEvent = data[0];
+      } else if (data?.events && data.events.length > 0) {
+        firstEvent = data.events[0];
+      } else if (data?.items && data.items.length > 0) {
+        firstEvent = data.items[0];
+      } else if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+        firstEvent = data.data[0];
+      }
+      
+      if (firstEvent) {
+        console.log('[Agenda] Estrutura do primeiro evento da API:');
+        console.log('  - calendarId:', firstEvent?.calendarId);
+        console.log('  - calendar_id:', firstEvent?.calendar_id);
+        console.log('  - organizer:', firstEvent?.organizer);
+        console.log('  - Evento completo:', firstEvent);
+      }
+      
       setAgendaData(data);
       
       // Processa os eventos e atualiza o calendário
       const processedEvents = processExternalEvents(data);
-      console.log('[Agenda] Eventos processados:', processedEvents);
+      console.log('[Agenda] Total de eventos processados:', processedEvents.length);
+      if (processedEvents.length > 0) {
+        console.log('[Agenda] Exemplo de evento processado (doctor_id/calendar_id):', processedEvents[0].doctor_id);
+        console.log('[Agenda] ⚠️ ATENÇÃO: Se doctor_id === "todos", há um problema na captura do calendar_id!');
+      }
       setExternalAppointments(processedEvents);
       
       toast.success(`${processedEvents.length} evento(s) carregado(s) com sucesso`);
@@ -445,8 +511,57 @@ export default function Agenda() {
     }
   }, [user?.role, selectedAgenda, viewMode, currentMonth, currentWeekDate, currentDayDate]);
 
-  const handleAppointmentClick = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
+  const handleAppointmentClick = async (appointment: Appointment) => {
+    console.log('[Agenda] Evento clicado:', appointment);
+    
+    // Criar cópia do appointment para não modificar o original
+    const appointmentCopy = { ...appointment };
+    
+    // Buscar nome do médico pelo calendar_id
+    if (appointmentCopy.doctor_id && appointmentCopy.doctor_id !== 'todos') {
+      try {
+        // Buscar o calendar_id na tabela profile_calendars
+        const { data: calendarData } = await supabase
+          .from('profile_calendars')
+          .select('profile_id, calendar_name')
+          .eq('calendar_id', appointmentCopy.doctor_id)
+          .single();
+        
+        if (calendarData) {
+          console.log('[Agenda] Calendar encontrado:', calendarData.calendar_name);
+          
+          // Buscar o nome do médico pelo profile_id
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', calendarData.profile_id)
+            .single();
+          
+          if (profileData) {
+            console.log('[Agenda] ✅ Nome do médico encontrado:', profileData.name);
+            // Substitui o doctor_id pelo nome do médico para exibição
+            appointmentCopy.doctor_id = profileData.name;
+          } else {
+            // Se não encontrou o perfil, usa o nome do calendário
+            console.log('[Agenda] Usando nome do calendário:', calendarData.calendar_name);
+            appointmentCopy.doctor_id = calendarData.calendar_name || appointmentCopy.doctor_id;
+          }
+        } else {
+          // Tenta buscar na lista de agendas carregadas
+          const agenda = agendas.find(a => a.id === appointmentCopy.doctor_id);
+          if (agenda) {
+            console.log('[Agenda] Usando nome da agenda:', agenda.nome);
+            appointmentCopy.doctor_id = agenda.nome;
+          } else {
+            console.warn('[Agenda] ⚠️ Não foi possível encontrar nome do médico para calendar_id:', appointmentCopy.doctor_id);
+          }
+        }
+      } catch (error) {
+        console.error('[Agenda] Erro ao buscar nome do médico:', error);
+      }
+    }
+    
+    setSelectedAppointment(appointmentCopy);
     setIsDialogOpen(true);
   };
 
@@ -487,6 +602,251 @@ export default function Agenda() {
       } else {
         fetchAgendaDetails('individual', selectedAgenda);
       }
+    }
+  };
+
+  // Callback quando um evento é atualizado
+  const handleEventUpdated = () => {
+    console.log('[Agenda] Evento atualizado, recarregando dados...');
+    
+    // Fechar o dialog de detalhes
+    setIsDialogOpen(false);
+    
+    // Recarregar dados da agenda
+    if (user?.role === 'owner' && selectedAgenda) {
+      if (selectedAgenda === 'todos') {
+        fetchAgendaDetails('todos');
+      } else {
+        fetchAgendaDetails('individual', selectedAgenda);
+      }
+    }
+  };
+
+  // Callback quando um evento é deletado
+  const handleEventDeleted = () => {
+    console.log('[Agenda] Evento deletado, recarregando dados...');
+    
+    // Fechar o dialog de detalhes
+    setIsDialogOpen(false);
+    
+    // Recarregar dados da agenda
+    if (user?.role === 'owner' && selectedAgenda) {
+      if (selectedAgenda === 'todos') {
+        fetchAgendaDetails('todos');
+      } else {
+        fetchAgendaDetails('individual', selectedAgenda);
+      }
+    }
+  };
+
+  // Abrir modal de edição
+  const handleEditEvent = (appointment: Appointment) => {
+    setEventToEdit(appointment);
+    setIsEditEventModalOpen(true);
+  };
+
+  // Abrir confirmação de exclusão
+  const handleDeleteEventClick = (appointment: Appointment) => {
+    // Encontrar o evento original com o calendar_id correto
+    const originalEvent = externalAppointments.find(apt => apt.id === appointment.id);
+    if (originalEvent) {
+      setEventToDelete(originalEvent);
+    } else {
+      setEventToDelete(appointment);
+    }
+    setShowDeleteDialog(true);
+  };
+
+  // Deletar evento
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return;
+
+    // Validar calendar_id
+    if (!eventToDelete.doctor_id || eventToDelete.doctor_id === 'todos') {
+      toast.error('Agenda não identificada para este evento');
+      console.error('[Agenda] Calendar ID inválido:', eventToDelete.doctor_id);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const payload = {
+        event_id: eventToDelete.id,
+        calendar_id: eventToDelete.doctor_id, // ID da agenda do Google Calendar
+      };
+
+      console.log('[Agenda] Deletando evento - Payload:', payload);
+      toast.loading('Deletando evento...');
+
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/apagar-evento', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.dismiss();
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro ao deletar evento: ${response.statusText}. ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[Agenda] Resposta do endpoint:', data);
+
+      toast.success('Evento deletado com sucesso!');
+      
+      // Fechar dialogs
+      setShowDeleteDialog(false);
+      setIsDialogOpen(false);
+      setEventToDelete(null);
+      
+      // Recarregar dados da agenda
+      if (user?.role === 'owner' && selectedAgenda) {
+        if (selectedAgenda === 'todos') {
+          fetchAgendaDetails('todos');
+        } else {
+          fetchAgendaDetails('individual', selectedAgenda);
+        }
+      }
+    } catch (error: any) {
+      console.error('[Agenda] Erro ao deletar evento:', error);
+      toast.error('Erro ao deletar evento: ' + error.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handler para mover evento (drag and drop)
+  const handleEventMoved = async (eventId: string, newDate: Date) => {
+    console.log('[Agenda] Movendo evento', eventId, 'para', newDate);
+    
+    // Encontrar o evento
+    const event = externalAppointments.find(apt => apt.id === eventId);
+    if (!event) {
+      toast.error('Evento não encontrado');
+      return;
+    }
+
+    // Se for feriado, não pode mover
+    if (event.status === 'holiday') {
+      toast.error('Feriados não podem ser movidos');
+      return;
+    }
+
+    try {
+      // Buscar informações completas do paciente e médico
+      const { data: patientData } = await supabase
+        .from('patients')
+        .select('name, email, phone')
+        .ilike('name', event.patient_id)
+        .limit(1)
+        .single();
+
+      const { data: doctorData } = await supabase
+        .from('profiles')
+        .select('id, name, email, specialization')
+        .eq('role', 'doctor')
+        .limit(1);
+
+      // Buscar calendar_id do médico
+      const { data: calendarData } = await supabase
+        .from('profile_calendars')
+        .select('profile_id, calendar_id')
+        .eq('calendar_id', event.doctor_id)
+        .limit(1)
+        .single();
+
+      let doctor = null;
+      if (calendarData && doctorData) {
+        doctor = doctorData.find(d => d.id === calendarData.profile_id);
+      }
+
+      // Obter a hora do evento original
+      const originalDate = new Date(event.scheduled_at);
+      const hours = originalDate.getHours();
+      const minutes = originalDate.getMinutes();
+
+      // Criar nova data mantendo a mesma hora
+      const newDateTime = new Date(newDate);
+      newDateTime.setHours(hours, minutes, 0, 0);
+
+      // Calcular hora final (1 hora depois)
+      const endDateTime = new Date(newDateTime);
+      endDateTime.setHours(endDateTime.getHours() + 1);
+
+      // Formatar datas
+      const formatDateTime = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:00`;
+      };
+
+      // Verificar se temos o calendar_id (NUNCA deve ser "todos")
+      if (!event.doctor_id || event.doctor_id === 'todos') {
+        toast.error('Agenda não identificada para este evento');
+        console.error('[Agenda] Calendar ID inválido:', event.doctor_id);
+        return;
+      }
+
+      // Montar payload completo para o endpoint de editar-evento
+      const payload = {
+        event_id: eventId,
+        calendar_id: event.doctor_id, // ID da agenda do Google Calendar (ex: abc@group.calendar.google.com)
+        nome_paciente: patientData?.name || event.patient_id,
+        email_paciente: patientData?.email || '',
+        nome_medico: doctor?.name || '',
+        email_medico: doctor?.email || '',
+        especialidade_medico: doctor?.specialization || '',
+        tipo_consulta: 'retorno', // Mantém como retorno para eventos movidos
+        data_inicio: formatDateTime(newDateTime),
+        data_final: formatDateTime(endDateTime),
+        notas: event.notes || '',
+      };
+
+      console.log('[Agenda - Drag&Drop] Enviando para /editar-evento');
+      console.log('Event ID:', eventId);
+      console.log('Calendar ID (Agenda):', event.doctor_id);
+      console.log('⚠️ Verificação: Calendar ID é "todos"?', event.doctor_id === 'todos');
+      console.log('Payload completo:', payload);
+      toast.loading('Movendo evento...');
+
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/editar-evento', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.dismiss();
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro ao mover evento: ${response.statusText}. ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[Agenda] Resposta do endpoint:', data);
+
+      toast.success('Evento movido com sucesso!');
+      
+      // Recarregar dados da agenda
+      if (user?.role === 'owner' && selectedAgenda) {
+        if (selectedAgenda === 'todos') {
+          fetchAgendaDetails('todos');
+        } else {
+          fetchAgendaDetails('individual', selectedAgenda);
+        }
+      }
+    } catch (error: any) {
+      console.error('[Agenda] Erro ao mover evento:', error);
+      toast.error('Erro ao mover evento: ' + error.message);
     }
   };
 
@@ -644,15 +1004,6 @@ export default function Agenda() {
             </div>
           </div>
 
-          {/* Status da agenda (apenas owner) */}
-          {user?.role === 'owner' && !loadingAgendaData && externalAppointments.length > 0 && (
-            <div className="pt-2 border-t">
-              <p className="text-sm text-green-600 flex items-center gap-2">
-                <span className="inline-block w-2 h-2 bg-green-600 rounded-full"></span>
-                {externalAppointments.length} evento(s) carregado(s) e exibidos no calendário
-              </p>
-            </div>
-          )}
         </div>
       </MagicBentoCard>
 
@@ -665,6 +1016,7 @@ export default function Agenda() {
                 appointments={displayedAppointments}
                 onDayClick={handleDayClick}
                 onAppointmentClick={handleAppointmentClick}
+                onEventMoved={handleEventMoved}
               />
             )}
             {viewMode === 'week' && (
@@ -674,6 +1026,7 @@ export default function Agenda() {
                 onDateChange={setCurrentWeekDate}
                 onDayClick={handleDayClick}
                 onAppointmentClick={handleAppointmentClick}
+                onEventMoved={handleEventMoved}
               />
             )}
             {viewMode === 'day' && (
@@ -683,6 +1036,7 @@ export default function Agenda() {
                 onDateChange={setCurrentDayDate}
                 onTimeSlotClick={handleDayClick}
                 onAppointmentClick={handleAppointmentClick}
+                onEventMoved={handleEventMoved}
               />
             )}
           </>
@@ -841,12 +1195,6 @@ export default function Agenda() {
       <div className="p-8 space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Agenda</h1>
-          <p className="text-muted-foreground mt-1">
-            {loadingAgendaData ? 'Carregando agendamentos...' : 
-             selectedAgenda
-               ? `${displayedAppointments.length} evento(s) - ${selectedAgenda === 'todos' ? 'Todos os Médicos' : agendas.find(a => a.id === selectedAgenda)?.nome || 'Agenda selecionada'}`
-               : 'Selecione uma agenda para visualizar os eventos'}
-          </p>
         </div>
 
         {user?.role === 'doctor' ? (
@@ -978,6 +1326,35 @@ export default function Agenda() {
               )}
             </div>
           )}
+          {selectedAppointment && selectedAppointment.status !== 'holiday' && (
+            <div className="flex justify-between gap-2 mt-4 pt-4 border-t">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  handleDeleteEventClick(selectedAppointment);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Deletar
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleEditEvent(selectedAppointment);
+                    setIsDialogOpen(false);
+                  }}
+                >
+                  Editar Evento
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -990,6 +1367,67 @@ export default function Agenda() {
         calendarId={selectedAgenda !== 'todos' ? selectedAgenda : undefined}
         onEventCreated={handleEventCreated}
       />
+
+      {/* Modal de edição de evento */}
+      <EditEventModal
+        open={isEditEventModalOpen}
+        onOpenChange={setIsEditEventModalOpen}
+        appointment={eventToEdit}
+        onEventUpdated={handleEventUpdated}
+        onEventDeleted={handleEventDeleted}
+      />
+
+      {/* Dialog de confirmação de exclusão */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar este evento? Esta ação não pode ser desfeita.
+              {eventToDelete && (
+                <div className="mt-4 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium text-foreground">
+                    {eventToDelete.patient_id}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {new Date(eventToDelete.scheduled_at).toLocaleDateString('pt-BR', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteEvent();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deletando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Deletar Evento
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

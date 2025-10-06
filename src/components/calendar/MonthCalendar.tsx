@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Appointment {
   id: string;
@@ -16,6 +18,7 @@ interface MonthCalendarProps {
   appointments: Appointment[];
   onDayClick?: (date: Date) => void;
   onAppointmentClick?: (appointment: Appointment) => void;
+  onEventMoved?: (eventId: string, newDate: Date) => void;
 }
 
 const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -33,8 +36,18 @@ const STATUS_COLORS = {
   holiday: 'bg-purple-600',
 };
 
-export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: MonthCalendarProps) {
+export function MonthCalendar({ appointments, onDayClick, onAppointmentClick, onEventMoved }: MonthCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
+  // Configurar sensors para drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -117,7 +130,40 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
     setCurrentDate(new Date());
   };
 
+  // Handlers do drag and drop
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      // active.id é o ID do evento
+      // over.id é a data no formato ISO do dia de destino
+      const eventId = active.id as string;
+      const targetDate = new Date(over.id as string);
+      
+      console.log('[MonthCalendar] Movendo evento', eventId, 'para', targetDate);
+      onEventMoved?.(eventId, targetDate);
+    }
+    
+    setActiveId(null);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const activeAppointment = activeId ? appointments.find(apt => apt.id === activeId) : null;
+
   return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
     <div className="w-full h-full flex flex-col bg-background rounded-lg border">
       {/* Header com navegação */}
       <div className="flex items-center justify-between p-4 border-b">
@@ -158,16 +204,30 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
           const isTodayDate = isToday(calDay.date);
           const hasHoliday = dayAppointments.some(apt => apt.status === 'holiday');
           const holidayName = dayAppointments.find(apt => apt.status === 'holiday')?.patient_id;
+          const droppableId = calDay.date.toISOString();
 
           return (
             <div
               key={index}
+              data-droppable-id={droppableId}
               className={cn(
                 'border-r border-b p-2 min-h-[120px] hover:bg-accent/50 transition-all cursor-pointer relative',
                 !calDay.isCurrentMonth && 'bg-muted/30',
                 index % 7 === 6 && 'border-r-0'
               )}
               onClick={() => onDayClick?.(calDay.date)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const eventId = e.dataTransfer.getData('text/plain');
+                if (eventId) {
+                  onEventMoved?.(eventId, calDay.date);
+                }
+              }}
             >
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between mb-1">
@@ -196,9 +256,15 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
                       return (
                         <div
                           key={apt.id}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', apt.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
                           className={cn(
-                            'text-xs p-1.5 rounded cursor-pointer transition-all text-white hover:opacity-80',
-                            STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
+                            'text-xs p-1.5 rounded cursor-move transition-all text-white hover:opacity-80 flex items-center gap-1',
+                            STATUS_COLORS[apt.status as keyof typeof STATUS_COLORS] || 'bg-gray-500',
+                            activeId === apt.id && 'opacity-50'
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -206,7 +272,8 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
                           }}
                           title={`${timeStr} - ${apt.patient_id}`}
                         >
-                          <div className="truncate">
+                          <GripVertical className="h-3 w-3 flex-shrink-0 opacity-70" />
+                          <div className="truncate flex-1">
                             {timeStr} - {apt.patient_id}
                           </div>
                         </div>
@@ -240,6 +307,23 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
         })}
       </div>
 
+      {/* Overlay do drag and drop */}
+      <DragOverlay>
+        {activeAppointment && (
+          <div
+            className={cn(
+              'text-xs p-1.5 rounded text-white shadow-lg flex items-center gap-1 opacity-90',
+              STATUS_COLORS[activeAppointment.status as keyof typeof STATUS_COLORS] || 'bg-gray-500'
+            )}
+          >
+            <GripVertical className="h-3 w-3 flex-shrink-0 opacity-70" />
+            <div className="truncate">
+              {new Date(activeAppointment.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {activeAppointment.patient_id}
+            </div>
+          </div>
+        )}
+      </DragOverlay>
+
       {/* Legenda de status */}
       <div className="flex flex-wrap items-center gap-4 p-4 border-t bg-muted/30">
         <span className="text-sm font-medium text-muted-foreground">Legenda:</span>
@@ -256,6 +340,7 @@ export function MonthCalendar({ appointments, onDayClick, onAppointmentClick }: 
         ))}
       </div>
     </div>
+    </DndContext>
   );
 }
 
