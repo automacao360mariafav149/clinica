@@ -26,7 +26,7 @@ const DAYS_OF_WEEK = [
 export default function DoctorSchedule() {
   const { doctorId } = useParams<{ doctorId: string }>();
   const navigate = useNavigate();
-  const { schedules, loading, saveSchedule } = useDoctorSchedule(doctorId || '');
+  const { schedules, loading, saveAllSchedules } = useDoctorSchedule(doctorId || '');
   
   const [doctorName, setDoctorName] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -116,19 +116,8 @@ export default function DoctorSchedule() {
 
     setIsSaving(true);
     try {
-      const promises = Object.values(localSchedules).map((schedule) => {
-        // Só salva horários ativos
-        if (schedule.is_active) {
-          return saveSchedule(schedule);
-        }
-        // Remove horários inativos se já existirem no banco
-        if (schedule.id) {
-          return saveSchedule({ ...schedule, is_active: false });
-        }
-        return Promise.resolve();
-      });
-
-      await Promise.all(promises);
+      // Salva todos os horários de uma vez (nova estrutura horizontal)
+      await saveAllSchedules(localSchedules);
       toast.success('Horários salvos com sucesso!');
     } catch (error: any) {
       toast.error('Erro ao salvar horários: ' + error.message);
