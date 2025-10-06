@@ -21,7 +21,7 @@ export const DashboardLayout = ({ children, requiredRoles }: DashboardLayoutProp
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-background relative">
+    <div className="flex h-screen w-full bg-background relative overflow-hidden">
       {/* Particles Background */}
       <div className="absolute inset-0 pointer-events-none opacity-30 z-0">
         <Particles
@@ -35,7 +35,7 @@ export const DashboardLayout = ({ children, requiredRoles }: DashboardLayoutProp
       </div>
       
       <Sidebar />
-      <main className="flex-1 overflow-auto relative z-10">
+      <main className="flex-1 h-full overflow-y-auto relative z-10">
         {children}
       </main>
     </div>

@@ -79,7 +79,7 @@ export function DiseaseTreemapCard() {
           <span className="text-lg font-semibold">Top Diagnósticos e Motivos de Consulta</span>
         </div>
         {diseaseStats.length > 0 ? (
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={450}>
             <BarChart 
               data={diseaseStats}
               layout="vertical"

@@ -88,14 +88,14 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col">
+    <div className="h-screen w-64 bg-sidebar-background border-r border-sidebar-border flex flex-col overflow-hidden">
       {/* Logo */}
-      <div className="p-6 flex justify-center">
+      <div className="p-6 flex justify-center flex-shrink-0">
         <img src="/logo-interno.png" alt="MedX" className="w-32 h-32 object-contain" />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {visibleItems.map((item) => (
           <NavLink
             key={item.path}
@@ -115,7 +115,7 @@ export const Sidebar = () => {
       </nav>
 
       {/* User Info */}
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
             <span className="text-primary font-semibold text-sm">
@@ -130,7 +130,7 @@ export const Sidebar = () => {
       </div>
 
       {/* Logout */}
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border flex-shrink-0">
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent/50"

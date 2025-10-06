@@ -144,7 +144,7 @@ export function InsuranceDonutCard() {
                 </div>
               </div>
               
-              <ResponsiveContainer width="100%" height={120}>
+              <ResponsiveContainer width="100%" height={150}>
                 <BarChart data={insuranceStats} layout="horizontal">
                   <XAxis 
                     type="category" 

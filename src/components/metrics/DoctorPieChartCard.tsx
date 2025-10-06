@@ -166,7 +166,7 @@ export function DoctorPieChartCard() {
             {doctorStats.length >= 3 && (
               <div className="mt-6 pt-6 border-t border-border">
                 <p className="text-xs text-muted-foreground mb-3 text-center">Distribuição Comparativa</p>
-                <ResponsiveContainer width="100%" height={180}>
+                <ResponsiveContainer width="100%" height={220}>
                   <RadarChart data={doctorStats.slice(0, 5)}>
                     <PolarGrid stroke="#333" />
                     <PolarAngleAxis 

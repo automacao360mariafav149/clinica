@@ -43,7 +43,7 @@ export function WeekdayChartCard() {
           <span className="text-lg font-semibold">Agendamentos por Dia da Semana</span>
         </div>
         {weekdayStats.some(s => s.count > 0) ? (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={350}>
             <BarChart data={weekdayStats}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.1} />
               <XAxis 
