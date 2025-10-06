@@ -1,0 +1,50 @@
+# ============================================================
+# TEMPLATE DE VARIÁVEIS DE AMBIENTE
+# ============================================================
+# 
+# INSTRUÇÕES:
+# 1. Copie todo o conteúdo abaixo (a partir de VITE_SUPABASE_URL)
+# 2. Crie um arquivo chamado .env.local na RAIZ do projeto
+# 3. Cole o conteúdo no arquivo
+# 4. Substitua os valores pelas suas credenciais do Supabase
+# 5. Salve o arquivo
+# 6. Execute: npm run build
+#
+# ============================================================
+
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anonima-aqui
+VITE_ENABLE_COMPONENT_TAGGER=false
+
+# ============================================================
+# COMO OBTER AS CREDENCIAIS DO SUPABASE:
+# ============================================================
+#
+# 1. Acesse: https://app.supabase.com/
+# 2. Selecione seu projeto
+# 3. Clique no ícone de engrenagem (Project Settings)
+# 4. Vá em "API" no menu lateral
+# 5. Copie:
+#    - Project URL → VITE_SUPABASE_URL
+#    - anon/public key → VITE_SUPABASE_ANON_KEY
+#
+# ============================================================
+# IMPORTANTE:
+# ============================================================
+#
+# ⚠️ As variáveis DEVEM começar com VITE_ (é obrigatório!)
+# ⚠️ NÃO use aspas nas URLs
+# ⚠️ NÃO deixe espaços antes ou depois do =
+# ⚠️ NÃO commite este arquivo no git (já está no .gitignore)
+# ⚠️ Use apenas a anon key, NUNCA a service_role key no frontend
+#
+# ============================================================
+# EXEMPLO PREENCHIDO:
+# ============================================================
+#
+# VITE_SUPABASE_URL=https://xyzabc123.supabase.co
+# VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# VITE_ENABLE_COMPONENT_TAGGER=false
+#
+# ============================================================
+
