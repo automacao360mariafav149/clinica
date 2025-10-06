@@ -16,14 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Microscope, AlertCircle, CheckCircle, FileUp, FileText, UserPlus, Link2, X } from 'lucide-react';
+import { Loader2, Microscope, AlertCircle, CheckCircle, FileUp, FileText, UserPlus, Link2, X, Image } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { uploadFile } from '@/lib/storageUtils';
-import { getApiBaseUrl } from '@/lib/apiConfig';
+import { analyzeExamWithGemini, getSupportedFileExtensions, getFileInputAccept, isSupportedFileType } from '@/lib/geminiAnalyzer';
 
 interface AgentExamModalProps {
   open: boolean;
@@ -72,9 +72,9 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
     
     if (!file) return;
     
-    // Verificar se é PDF
-    if (file.type !== 'application/pdf') {
-      setError('Por favor, selecione apenas arquivos PDF');
+    // Verificar se é um tipo suportado (PDF ou imagem)
+    if (!isSupportedFileType(file.type)) {
+      setError(`Por favor, selecione apenas arquivos: ${getSupportedFileExtensions()}`);
       return;
     }
     
@@ -87,7 +87,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
     
     setSelectedFile(file);
     // Definir nome editável (sem extensão para facilitar edição)
-    const nameWithoutExtension = file.name.replace(/\.pdf$/i, '');
+    const nameWithoutExtension = file.name.replace(/\.(pdf|png|jpg|jpeg|webp)$/i, '');
     setEditableFileName(nameWithoutExtension);
     setError(null);
   };
@@ -104,7 +104,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
     e.preventDefault();
     
     if (!selectedFile) {
-      setError('Por favor, selecione um arquivo PDF');
+      setError('Por favor, selecione um arquivo');
       return;
     }
 
@@ -113,74 +113,23 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
     setResultado(null);
 
     try {
-      // Criar FormData para enviar o arquivo
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('filename', selectedFile.name);
-
-      const apiBaseUrl = await getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/agent-exame`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro HTTP:', response.status, errorText);
-        throw new Error(`Erro na requisição: ${response.status} ${response.statusText}`);
-      }
-
-      const rawData = await response.json();
-      console.log('Resposta bruta da API:', rawData);
+      console.log('🚀 Iniciando análise do exame com Gemini Flash...');
       
-      // A API retorna um array com objeto contendo output
-      let examData: ExamData;
-      
-      try {
-        // Verificar se é um array e pegar o primeiro elemento
-        const dataObject = Array.isArray(rawData) ? rawData[0] : rawData;
-        
-        if (!dataObject) {
-          throw new Error('Resposta vazia do servidor');
-        }
-        
-        // Verificar se tem o campo output
-        if (dataObject.output && typeof dataObject.output === 'string') {
-          console.log('✅ Output encontrado com', dataObject.output.length, 'caracteres');
-          
-          // Tentar parsear o output como JSON (caso venha estruturado)
-          try {
-            const parsedOutput = JSON.parse(dataObject.output);
-            examData = parsedOutput;
-          } catch {
-            // Se não for JSON, usar como está (Markdown direto)
-            examData = {
-              output: dataObject.output,
-            };
-          }
-        } else if (dataObject.analise !== undefined) {
-          // Se já vier no formato esperado (estruturado)
-          console.log('Resposta já no formato de objeto direto');
-          examData = dataObject as ExamData;
-        } else {
-          console.error('Formato de resposta não reconhecido:', rawData);
-          throw new Error('Formato de resposta da API não reconhecido');
-        }
-      } catch (parseError) {
-        console.error('Erro ao processar resposta:', parseError, 'Dados brutos:', rawData);
-        throw new Error('Erro ao processar resposta do servidor');
-      }
+      // Analisar exame usando Gemini Flash
+      const examData = await analyzeExamWithGemini(selectedFile);
       
       // Validar que temos conteúdo
       if (!examData.output && !examData.analise) {
-        console.error('Resposta da API está incompleta:', examData);
-        throw new Error('A resposta da API está incompleta');
+        console.error('Resposta do Gemini está incompleta:', examData);
+        throw new Error('A análise do Gemini está incompleta');
       }
       
-      console.log('✅ Dados validados e prontos para exibição:', examData);
+      console.log('✅ Análise completa! Tamanho:', examData.output?.length || 0, 'caracteres');
       setResultado(examData);
+      
+      toast.success('Exame analisado com sucesso!');
     } catch (err) {
-      console.error('Erro ao analisar exame:', err);
+      console.error('❌ Erro ao analisar exame:', err);
       
       let errorMessage = 'Erro ao analisar exame. Tente novamente.';
       
@@ -191,6 +140,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
       }
       
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -257,8 +207,9 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
     setSavingToPatient(true);
 
     try {
-      // Nome final do arquivo (editável + .pdf)
-      const finalFileName = editableFileName.trim() ? `${editableFileName.trim()}.pdf` : selectedFile.name;
+      // Nome final do arquivo (editável + extensão original)
+      const fileExtension = selectedFile.name.split('.').pop() || 'pdf';
+      const finalFileName = editableFileName.trim() ? `${editableFileName.trim()}.${fileExtension}` : selectedFile.name;
       
       // 1. Fazer upload do PDF para o storage
       console.log('📤 Fazendo upload do PDF para o storage...');
@@ -350,7 +301,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
           <div className={`overflow-y-auto overflow-x-hidden px-6 py-4 space-y-6 ${resultado ? 'max-h-[calc(95vh-180px)]' : ''}`}>
             {/* Upload de Arquivo */}
             <div className="space-y-2">
-              <Label htmlFor="file-upload">Arquivo do Exame (PDF) *</Label>
+              <Label htmlFor="file-upload">Arquivo do Exame (PDF ou Imagem) *</Label>
               
               {!selectedFile ? (
                 <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
@@ -358,7 +309,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
                     ref={fileInputRef}
                     id="file-upload"
                     type="file"
-                    accept="application/pdf"
+                    accept={getFileInputAccept()}
                     onChange={handleFileSelect}
                     className="hidden"
                     disabled={loading}
@@ -367,13 +318,18 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
                     htmlFor="file-upload"
                     className="cursor-pointer flex flex-col items-center gap-3"
                   >
-                    <div className="p-4 rounded-full bg-orange-500/10">
-                      <FileUp className="w-8 h-8 text-orange-500" />
+                    <div className="flex gap-2">
+                      <div className="p-4 rounded-full bg-orange-500/10">
+                        <FileUp className="w-8 h-8 text-orange-500" />
+                      </div>
+                      <div className="p-4 rounded-full bg-orange-500/10">
+                        <Image className="w-8 h-8 text-orange-500" />
+                      </div>
                     </div>
                     <div>
-                      <p className="font-medium">Clique para selecionar um arquivo PDF</p>
+                      <p className="font-medium">Clique para selecionar um arquivo</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Tamanho máximo: 10MB
+                        Formatos: {getSupportedFileExtensions()} • Máximo: 10MB
                       </p>
                     </div>
                   </label>
@@ -424,7 +380,7 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
               )}
               
               <p className="text-xs text-muted-foreground">
-                Faça upload do PDF do exame laboratorial para análise
+                Faça upload do arquivo do exame (PDF ou imagem) para análise com Gemini Flash
               </p>
             </div>
 
