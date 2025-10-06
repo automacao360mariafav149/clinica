@@ -4,6 +4,7 @@ import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { MonthCalendar } from '@/components/calendar/MonthCalendar';
 import { WeekCalendar } from '@/components/calendar/WeekCalendar';
 import { DayCalendar } from '@/components/calendar/DayCalendar';
+import { CreateEventModal } from '@/components/agenda/CreateEventModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDoctorSchedule, DoctorSchedule as ScheduleType } from '@/hooks/useDoctorSchedule';
 import { 
@@ -61,6 +62,11 @@ export default function Agenda() {
 
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Estados para o modal de criação de eventos
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [createEventDate, setCreateEventDate] = useState<Date | undefined>();
+  const [createEventStartTime, setCreateEventStartTime] = useState<string | undefined>();
 
   // Estado para controlar o modo de visualização
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
@@ -445,8 +451,43 @@ export default function Agenda() {
   };
 
   const handleDayClick = (date: Date) => {
-    console.log('Dia clicado:', date);
-    // Aqui você pode adicionar lógica para criar novo appointment, por exemplo
+    console.log('[Agenda] Dia/horário clicado:', date);
+    
+    // Define a data do evento
+    setCreateEventDate(date);
+    
+    // Define o horário inicial baseado no clique
+    // Se já tem horário (modo diário), usa ele
+    // Caso contrário, usa 09:00 como padrão
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    
+    if (hours === 0 && minutes === 0) {
+      // Clique em dia sem horário específico (modo mensal/semanal)
+      setCreateEventStartTime('09:00');
+    } else {
+      // Clique com horário específico (modo diário)
+      setCreateEventStartTime(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+      );
+    }
+    
+    // Abre o modal de criação
+    setIsCreateEventModalOpen(true);
+  };
+
+  // Callback quando um evento é criado
+  const handleEventCreated = () => {
+    console.log('[Agenda] Evento criado, recarregando dados...');
+    
+    // Recarregar dados da agenda
+    if (user?.role === 'owner' && selectedAgenda) {
+      if (selectedAgenda === 'todos') {
+        fetchAgendaDetails('todos');
+      } else {
+        fetchAgendaDetails('individual', selectedAgenda);
+      }
+    }
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -939,6 +980,16 @@ export default function Agenda() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Modal de criação de evento */}
+      <CreateEventModal
+        open={isCreateEventModalOpen}
+        onOpenChange={setIsCreateEventModalOpen}
+        initialDate={createEventDate}
+        initialStartTime={createEventStartTime}
+        calendarId={selectedAgenda !== 'todos' ? selectedAgenda : undefined}
+        onEventCreated={handleEventCreated}
+      />
     </DashboardLayout>
   );
 }
