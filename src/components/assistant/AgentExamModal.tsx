@@ -380,7 +380,10 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
               )}
               
               <p className="text-xs text-muted-foreground">
-                Faça upload do arquivo do exame (PDF ou imagem) para análise com Gemini Flash
+                Faça upload do arquivo do exame (PDF ou imagem) para análise
+              </p>
+              <p className="text-xs text-muted-foreground italic mt-1">
+                * Análise feita por IA
               </p>
             </div>
 
