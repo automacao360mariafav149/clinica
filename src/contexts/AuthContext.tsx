@@ -49,48 +49,37 @@ function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string)
  * Usa RPC para melhor confiabilidade.
  */
 async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
-  console.log('[AuthContext] Buscando perfil para usuário:', supaUser.id, supaUser.email);
+  console.log('[DEBUG] Iniciando busca de perfil...');
+  console.time('[DEBUG] Tempo total da RPC');
   
-  try {
-    // Usa RPC (Remote Procedure Call) que é mais confiável e rápido
-    const rpcPromise = supabase.rpc('get_current_user_profile');
-
-    const { data: profiles, error } = await withTimeout(
-      rpcPromise,
-      15000, // 15 segundos deve ser suficiente para RPC
-      'Timeout ao buscar perfil do usuário'
-    );
-
-    console.log('[AuthContext] Resposta da RPC:', { profiles, error });
-
-    if (error) {
-      console.error('[AuthContext] Erro ao buscar perfil:', error);
-      throw new Error(`Erro ao buscar perfil: ${error.message}`);
-    }
-
-    // RPC retorna array, pega o primeiro (ou null se vazio)
-    const profile = profiles && profiles.length > 0 ? profiles[0] : null;
-
-    if (!profile) {
-      console.error('[AuthContext] Perfil não encontrado para usuário:', supaUser.id);
-      throw new Error('Seu perfil não foi encontrado no sistema. Entre em contato com o administrador.');
-    }
-
-    console.log('[AuthContext] Perfil encontrado:', profile);
-
-    // Sempre usar dados do banco, nunca do metadata
-    // IMPORTANTE: id = profiles.id (usar para FK), auth_id = auth.uid()
-    return {
-      id: (profile as { id?: string }).id || supaUser.id, // ID do perfil na tabela profiles
-      auth_id: supaUser.id, // ID do Supabase Auth
-      email: supaUser.email || '',
-      name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
-      role: (profile as { role?: UserRole }).role || 'doctor',
-    };
-  } catch (error) {
-    console.error('[AuthContext] Exceção ao buscar perfil:', error);
-    throw error;
+  const rpcPromise = supabase.rpc('get_current_user_profile');
+  const { data: profiles, error } = await withTimeout(rpcPromise, 15000, 'Timeout ao buscar perfil do usuário');
+  
+  console.timeEnd('[DEBUG] Tempo total da RPC');
+  console.log('[DEBUG] Resultado da RPC:', profiles);
+  console.log('[DEBUG] Erro da RPC:', error);
+  
+  if (error) {
+    console.error('[AuthContext] Erro ao buscar perfil:', error);
+    throw new Error(`Erro ao buscar perfil: ${error.message}`);
   }
+
+  const profile = profiles && profiles.length > 0 ? profiles[0] : null;
+
+  if (!profile) {
+    console.error('[AuthContext] Nenhum perfil encontrado');
+    throw new Error('Seu perfil não foi encontrado no sistema. Entre em contato com o administrador.');
+  }
+
+  console.log('[DEBUG] Perfil encontrado:', profile);
+
+  return {
+    id: (profile as { id?: string }).id || supaUser.id,
+    auth_id: supaUser.id,
+    email: supaUser.email || '',
+    name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
+    role: (profile as { role?: UserRole }).role || 'doctor',
+  };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -118,60 +107,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let isProcessing = false; // Flag para prevenir chamadas duplicadas
+  
     const init = async () => {
-      console.log('[AuthContext] Inicializando contexto de autenticação...');
-      setIsLoading(true);
+      if (isProcessing) return;
+      isProcessing = true;
+  
       try {
         const { data } = await supabase.auth.getSession();
         const currentUser = data.session?.user;
-        
         if (currentUser) {
-          console.log('[AuthContext] Sessão encontrada, carregando perfil...');
-          try {
-            const mapped = await mapSupabaseUserToAppUser(currentUser);
-            setUser(mapped);
-            console.log('[AuthContext] Perfil carregado com sucesso');
-          } catch (error) {
-            console.error('[AuthContext] Erro ao carregar perfil do usuário:', error);
-            // Se o perfil não existe ou há erro, fazer logout
-            await supabase.auth.signOut();
-            setUser(null);
-          }
-        } else {
-          console.log('[AuthContext] Nenhuma sessão ativa');
-        }
-      } catch (error) {
-        console.error('[AuthContext] Erro ao inicializar autenticação:', error);
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    init();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Mudança de estado de autenticação:', event);
-      const currentUser = session?.user;
-      
-      if (currentUser && event !== 'SIGNED_OUT') {
-        console.log('[AuthContext] Usuário autenticado, carregando perfil...');
-        try {
           const mapped = await mapSupabaseUserToAppUser(currentUser);
           setUser(mapped);
-          console.log('[AuthContext] Perfil atualizado após mudança de estado');
-        } catch (error) {
-          console.error('[AuthContext] Erro ao atualizar usuário após mudança de estado:', error);
-          // Fazer logout em caso de erro para evitar estado inconsistente
-          await supabase.auth.signOut();
+        }
+      } finally {
+        isProcessing = false;
+      }
+    };
+  
+    init();
+  
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (isProcessing) return; // Previne processamento duplicado
+      isProcessing = true;
+  
+      try {
+        console.log('[AuthContext] Mudança de estado de autenticação:', event);
+        const currentUser = session?.user;
+  
+        if (currentUser && event !== 'SIGNED_OUT') {
+          console.log('[AuthContext] Usuário autenticado, carregando perfil...');
+          const mapped = await mapSupabaseUserToAppUser(currentUser);
+          setUser(mapped);
+        } else {
           setUser(null);
         }
-      } else {
-        console.log('[AuthContext] Usuário deslogado');
+      } catch (error) {
+        console.error('[AuthContext] Erro ao atualizar usuário após mudança de estado:', error);
         setUser(null);
+      } finally {
+        isProcessing = false;
       }
     });
-
+  
     return () => {
       listener.subscription.unsubscribe();
     };
