@@ -4,7 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Plug, User, Calendar, Clock, Phone } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Plug, User, Calendar, Clock, Phone, Play, Power, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Instance {
@@ -23,6 +26,27 @@ export default function Integration() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
+  const [editNameModal, setEditNameModal] = useState<{ open: boolean; instanceId: string; currentName: string }>({
+    open: false,
+    instanceId: '',
+    currentName: '',
+  });
+  const [newName, setNewName] = useState('');
+  const [connectModal, setConnectModal] = useState<{ 
+    open: boolean; 
+    instanceName: string; 
+    phoneNumber: string;
+    paircode: string;
+    isWaitingConnection: boolean;
+  }>({
+    open: false,
+    instanceName: '',
+    phoneNumber: '',
+    paircode: '',
+    isWaitingConnection: false,
+  });
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   const formatDate = (dateString: string) => {
     try {
@@ -82,9 +106,254 @@ export default function Integration() {
     }
   };
 
+  const openConnectModal = (instanceName: string) => {
+    setConnectModal({ 
+      open: true, 
+      instanceName, 
+      phoneNumber: '',
+      paircode: '',
+      isWaitingConnection: false,
+    });
+  };
+
+  const checkConnectionStatus = async (instanceName: string) => {
+    try {
+      console.log('🔍 Verificando status da instância:', instanceName);
+      
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/listar-instancias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao verificar status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📦 Dados recebidos:', data);
+      console.log('📋 Tipo dos dados:', Array.isArray(data) ? 'Array' : 'Objeto');
+      
+      let foundItem = null;
+      
+      // Procura a instância - pode ser array [{...}] ou objeto direto {...}
+      if (Array.isArray(data)) {
+        console.log('🔎 Buscando instância no ARRAY com nome:', instanceName);
+        foundItem = data.find((item: any) => {
+          console.log('  - Verificando item:', item.name, '===', instanceName, '?', item.name === instanceName);
+          return item.name === instanceName;
+        });
+      } else if (data && typeof data === 'object') {
+        console.log('🔎 Verificando OBJETO direto com nome:', data.name);
+        // Se for um objeto direto, verifica se o nome bate
+        if (data.name === instanceName) {
+          foundItem = data;
+          console.log('✅ Nome bate!');
+        } else {
+          console.log('❌ Nome não bate:', data.name, '!==', instanceName);
+        }
+      }
+      
+      console.log('✅ Instância encontrada:', foundItem);
+      
+      // Verifica se a instância está conectada
+      if (foundItem) {
+        console.log('📊 Status atual:', foundItem.status);
+        
+        if (foundItem.status === 'connected') {
+          console.log('🎉 Status CONNECTED detectado! Fechando modal...');
+          
+          // Parar polling
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          
+          // Mostrar sucesso e fechar modal
+          toast.success('✅ Instância conectada com sucesso!');
+          setConnectModal({ 
+            open: false, 
+            instanceName: '', 
+            phoneNumber: '',
+            paircode: '',
+            isWaitingConnection: false,
+          });
+          
+          // Atualizar lista
+          await fetchInstances();
+          
+          return true;
+        } else {
+          console.log('⏳ Status ainda é:', foundItem.status, '- Aguardando...');
+        }
+      } else {
+        console.log('❌ Instância não encontrada');
+      }
+      
+      return false;
+    } catch (err) {
+      console.error('Erro ao verificar status:', err);
+      return false;
+    }
+  };
+
+  const handleConnect = async () => {
+    if (!connectModal.instanceName.trim()) {
+      toast.error('Por favor, insira o nome da instância');
+      return;
+    }
+
+    if (!connectModal.phoneNumber.trim()) {
+      toast.error('Por favor, insira o número de telefone');
+      return;
+    }
+
+    setActionLoading(prev => ({ ...prev, [`connect-${connectModal.instanceName}`]: true }));
+    
+    try {
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/conectar-instancia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          name: connectModal.instanceName.trim(),
+          phoneNumber: connectModal.phoneNumber.trim(),
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao conectar instância: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extrair paircode da resposta do endpoint /conectar-instancia
+      // Estrutura: [{instance: {paircode: "5YE9-GA45"}}]
+      let paircode = '';
+      if (Array.isArray(data) && data.length > 0) {
+        paircode = data[0]?.instance?.paircode || '';
+      } else if (data.instance?.paircode) {
+        paircode = data.instance.paircode || '';
+      }
+      
+      if (paircode) {
+        // Atualizar modal com paircode e estado de aguardando
+        setConnectModal(prev => ({ 
+          ...prev, 
+          paircode,
+          isWaitingConnection: true,
+        }));
+        
+        toast.success('Código de pareamento gerado! Aguardando conexão...');
+        
+        // Iniciar polling a cada 2 segundos
+        const interval = setInterval(() => {
+          checkConnectionStatus(connectModal.instanceName);
+        }, 2000);
+        
+        setPollingInterval(interval);
+      } else {
+        toast.error('Não foi possível obter o código de pareamento');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast.error(`Erro ao conectar: ${errorMessage}`);
+      console.error('Erro ao conectar instância:', err);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`connect-${connectModal.instanceName}`]: false }));
+    }
+  };
+
+  const handleDisconnect = async (instanceName: string) => {
+    setActionLoading(prev => ({ ...prev, [`disconnect-${instanceName}`]: true }));
+    
+    try {
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/desconectar-instancias', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: instanceName }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao desconectar instância: ${response.status}`);
+      }
+      
+      toast.success('Instância desconectada com sucesso!');
+      await fetchInstances(); // Atualiza a lista
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast.error(`Erro ao desconectar: ${errorMessage}`);
+      console.error('Erro ao desconectar instância:', err);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`disconnect-${instanceName}`]: false }));
+    }
+  };
+
+  const handleUpdateName = async () => {
+    if (!newName.trim()) {
+      toast.error('Por favor, insira um nome válido');
+      return;
+    }
+
+    setActionLoading(prev => ({ ...prev, [`update-${editNameModal.instanceId}`]: true }));
+    
+    try {
+      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/atualizar-nome-instancia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          instanceId: editNameModal.instanceId,
+          currentName: editNameModal.currentName,
+          newName: newName.trim(),
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao atualizar nome: ${response.status}`);
+      }
+      
+      toast.success('Nome da instância atualizado com sucesso!');
+      setEditNameModal({ open: false, instanceId: '', currentName: '' });
+      setNewName('');
+      await fetchInstances(); // Atualiza a lista
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast.error(`Erro ao atualizar nome: ${errorMessage}`);
+      console.error('Erro ao atualizar nome:', err);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [`update-${editNameModal.instanceId}`]: false }));
+    }
+  };
+
+  const openEditNameModal = (instanceId: string, currentName: string) => {
+    setEditNameModal({ open: true, instanceId, currentName });
+    setNewName(currentName);
+  };
+
   useEffect(() => {
     fetchInstances();
   }, []);
+
+  // Limpar polling quando o modal fechar ou componente desmontar
+  useEffect(() => {
+    if (!connectModal.open && pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+    
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [connectModal.open, pollingInterval]);
 
   return (
     <DashboardLayout>
@@ -269,6 +538,57 @@ export default function Integration() {
                       </div>
                     </div>
                   )}
+
+                  {/* Divider */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-4" />
+
+                  {/* Botões de Ação */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Botão Conectar */}
+                      <Button
+                        variant={instance.status === 'connected' ? 'secondary' : 'default'}
+                        size="sm"
+                        className="w-full gap-2"
+                        disabled={instance.status === 'connected' || actionLoading[`connect-${instance.name}`]}
+                        onClick={() => instance.name && openConnectModal(instance.name)}
+                      >
+                        {actionLoading[`connect-${instance.name}`] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                        Conectar
+                      </Button>
+
+                      {/* Botão Desconectar */}
+                      <Button
+                        variant={instance.status !== 'connected' ? 'secondary' : 'destructive'}
+                        size="sm"
+                        className="w-full gap-2"
+                        disabled={instance.status !== 'connected' || actionLoading[`disconnect-${instance.name}`]}
+                        onClick={() => instance.name && handleDisconnect(instance.name)}
+                      >
+                        {actionLoading[`disconnect-${instance.name}`] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Power className="w-4 h-4" />
+                        )}
+                        Desconectar
+                      </Button>
+                    </div>
+
+                    {/* Botão Atualizar Nome */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => instance.id && openEditNameModal(instance.id, instance.name || '')}
+                    >
+                      <Edit className="w-4 h-4" />
+                      Atualizar nome da Instância
+                    </Button>
+                  </div>
                 </CardContent>
                 
                 {/* Borda animada no hover */}
@@ -306,6 +626,237 @@ export default function Integration() {
           </Card>
         )}
       </div>
+
+      {/* Dialog para conectar instância */}
+      <Dialog open={connectModal.open} onOpenChange={(open) => {
+        if (!open) {
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+          setConnectModal({ 
+            open: false, 
+            instanceName: '', 
+            phoneNumber: '',
+            paircode: '',
+            isWaitingConnection: false,
+          });
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Play className="w-5 h-5 text-primary" />
+              {connectModal.isWaitingConnection ? 'Aguardando Conexão' : 'Conectar Instância WhatsApp'}
+            </DialogTitle>
+            <DialogDescription>
+              {connectModal.isWaitingConnection 
+                ? 'Utilize o código abaixo para parear sua instância do WhatsApp' 
+                : 'Informe o nome da instância e o número de telefone para conectar.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!connectModal.isWaitingConnection ? (
+            // Formulário inicial
+            <>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="instanceName" className="text-sm font-medium">
+                    Nome da Instância
+                  </Label>
+                  <Input
+                    id="instanceName"
+                    placeholder="Digite o nome da instância"
+                    value={connectModal.instanceName}
+                    onChange={(e) => setConnectModal(prev => ({ ...prev, instanceName: e.target.value }))}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                    Número de Telefone
+                  </Label>
+                  <Input
+                    id="phoneNumber"
+                    type="tel"
+                    placeholder="Digite o número de telefone (ex: 5511999999999)"
+                    value={connectModal.phoneNumber}
+                    onChange={(e) => setConnectModal(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !actionLoading[`connect-${connectModal.instanceName}`]) {
+                        handleConnect();
+                      }
+                    }}
+                    className="col-span-3"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setConnectModal({ 
+                      open: false, 
+                      instanceName: '', 
+                      phoneNumber: '',
+                      paircode: '',
+                      isWaitingConnection: false,
+                    });
+                  }}
+                  disabled={actionLoading[`connect-${connectModal.instanceName}`]}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConnect}
+                  disabled={
+                    actionLoading[`connect-${connectModal.instanceName}`] || 
+                    !connectModal.instanceName.trim() || 
+                    !connectModal.phoneNumber.trim()
+                  }
+                  className="gap-2"
+                >
+                  {actionLoading[`connect-${connectModal.instanceName}`] ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Conectando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Conectar
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            // Tela de aguardando com paircode
+            <>
+              <div className="py-6 space-y-6">
+                {/* Código de Pareamento */}
+                <div className="flex flex-col items-center justify-center gap-4">
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border-2 border-primary/20 shadow-lg">
+                    <p className="text-5xl font-bold tracking-wider text-primary font-mono">
+                      {connectModal.paircode}
+                    </p>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Código de Pareamento
+                    </p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      Abra o WhatsApp no seu celular, vá em <strong>Aparelhos conectados</strong> e insira o código acima
+                    </p>
+                  </div>
+                </div>
+
+                {/* Indicador de aguardando */}
+                <div className="flex items-center justify-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  <div className="flex-1 text-center">
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Aguardando conexão...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Verificando status a cada 2 segundos
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (pollingInterval) {
+                      clearInterval(pollingInterval);
+                      setPollingInterval(null);
+                    }
+                    setConnectModal({ 
+                      open: false, 
+                      instanceName: '', 
+                      phoneNumber: '',
+                      paircode: '',
+                      isWaitingConnection: false,
+                    });
+                  }}
+                  className="gap-2"
+                >
+                  Cancelar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para editar nome da instância */}
+      <Dialog open={editNameModal.open} onOpenChange={(open) => {
+        if (!open) {
+          setEditNameModal({ open: false, instanceId: '', currentName: '' });
+          setNewName('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primary" />
+              Atualizar Nome da Instância
+            </DialogTitle>
+            <DialogDescription>
+              Digite o novo nome para a instância. O nome atual é: <strong>{editNameModal.currentName}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name" className="text-sm font-medium">
+                Novo nome
+              </Label>
+              <Input
+                id="name"
+                placeholder="Digite o novo nome da instância"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleUpdateName();
+                  }
+                }}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditNameModal({ open: false, instanceId: '', currentName: '' });
+                setNewName('');
+              }}
+              disabled={actionLoading[`update-${editNameModal.instanceId}`]}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleUpdateName}
+              disabled={actionLoading[`update-${editNameModal.instanceId}`] || !newName.trim()}
+              className="gap-2"
+            >
+              {actionLoading[`update-${editNameModal.instanceId}`] ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Atualizando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Atualizar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
