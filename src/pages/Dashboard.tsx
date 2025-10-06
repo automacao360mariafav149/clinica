@@ -3,6 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MagicBentoGrid, MagicBentoCard } from '@/components/bento/MagicBento';
 import { Users, Calendar, TrendingUp, Clock, Activity, Stethoscope } from 'lucide-react';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { PeakHoursChartCard } from '@/components/metrics/PeakHoursChartCard';
+import { WeekdayChartCard } from '@/components/metrics/WeekdayChartCard';
+import { DoctorPieChartCard } from '@/components/metrics/DoctorPieChartCard';
+import { InsuranceDonutCard } from '@/components/metrics/InsuranceDonutCard';
+import { DiseaseTreemapCard } from '@/components/metrics/DiseaseTreemapCard';
 
 export default function Dashboard() {
   const today = new Date();
@@ -54,104 +59,22 @@ export default function Dashboard() {
           ))}
         </MagicBentoGrid>
 
-        {/* Charts Grid */}
+        {/* Charts Grid - Linha 1: Gráficos de Tempo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Horários Mais Procurados */}
-          <MagicBentoCard>
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Clock className="w-5 h-5 text-primary" />
-                <span className="text-lg font-semibold">Horários Mais Procurados</span>
-              </div>
-              <div className="space-y-3">
-                {['09:00 - 10:00', '14:00 - 15:00', '16:00 - 17:00', '10:00 - 11:00'].map((time, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-foreground">{time}</span>
-                        <span className="text-sm text-muted-foreground">{85 - i * 10}%</span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                          style={{ width: `${85 - i * 10}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </MagicBentoCard>
-
-          {/* Consultas por Médico */}
-          <MagicBentoCard>
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Stethoscope className="w-5 h-5 text-primary" />
-                <span className="text-lg font-semibold">Consultas por Médico</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { name: 'Dr. Silva', count: 45 },
-                  { name: 'Dra. Santos', count: 38 },
-                  { name: 'Dr. Oliveira', count: 32 },
-                  { name: 'Dra. Costa', count: 28 },
-                ].map((doctor, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <span className="text-primary font-semibold text-sm">
-                          {doctor.name.charAt(doctor.name.indexOf('.') + 2)}
-                        </span>
-                      </div>
-                      <span className="text-sm text-foreground">{doctor.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">{doctor.count}</span>
-                      <Activity className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </MagicBentoCard>
+          <PeakHoursChartCard />
+          <WeekdayChartCard />
         </div>
 
-        {/* Pacientes Recentes */}
-        <MagicBentoCard>
-          <div className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-5 h-5 text-primary" />
-              <span className="text-lg font-semibold">Pacientes Recentes</span>
-            </div>
-            <div className="space-y-4">
-              {[
-                { name: 'João Silva', date: 'Hoje, 14:30', status: 'Confirmado' },
-                { name: 'Maria Santos', date: 'Hoje, 15:00', status: 'Em atendimento' },
-                { name: 'Pedro Costa', date: 'Hoje, 15:30', status: 'Aguardando' },
-                { name: 'Ana Oliveira', date: 'Hoje, 16:00', status: 'Confirmado' },
-              ].map((patient, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">
-                        {patient.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{patient.name}</p>
-                      <p className="text-xs text-muted-foreground">{patient.date}</p>
-                    </div>
-                  </div>
-                  <div className="px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium">
-                    {patient.status}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </MagicBentoCard>
+        {/* Charts Grid - Linha 2: Gráficos de Pizza */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <DoctorPieChartCard />
+          <InsuranceDonutCard />
+        </div>
+
+        {/* Charts Grid - Linha 3: Gráfico de Diagnósticos */}
+        <div className="grid grid-cols-1 gap-6">
+          <DiseaseTreemapCard />
+        </div>
       </div>
     </DashboardLayout>
   );
