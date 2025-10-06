@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { MonthCalendar } from '@/components/calendar/MonthCalendar';
+import { WeekCalendar } from '@/components/calendar/WeekCalendar';
+import { DayCalendar } from '@/components/calendar/DayCalendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDoctorSchedule, DoctorSchedule as ScheduleType } from '@/hooks/useDoctorSchedule';
 import { 
@@ -18,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, User, FileText, Save, Loader2, Filter } from 'lucide-react';
+import { Calendar, Clock, User, FileText, Save, Loader2, Filter, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Appointment {
@@ -60,13 +62,20 @@ export default function Agenda() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Estado para controlar o modo de visualização
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
+
+  // Estados para datas de cada modo de visualização
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
+  const [currentDayDate, setCurrentDayDate] = useState(new Date());
+
   // Estados para gestão de agendas (owner)
   const [agendas, setAgendas] = useState<AgendaItem[]>([]);
   const [selectedAgenda, setSelectedAgenda] = useState<string>('todos');
   const [agendaData, setAgendaData] = useState<AgendaData | null>(null);
   const [loadingAgendas, setLoadingAgendas] = useState(false);
   const [loadingAgendaData, setLoadingAgendaData] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [externalAppointments, setExternalAppointments] = useState<Appointment[]>([]);
 
   // Hook para gerenciar horários (apenas para médicos)
@@ -280,34 +289,69 @@ export default function Agenda() {
     }
   };
 
-  // Calcula as datas visíveis no calendário mensal
-  const getCalendarDateRange = (date: Date) => {
+  // Função para formatar data sem timezone (YYYY-MM-DDTHH:MM:SS)
+  const formatDateWithoutTimezone = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  };
+
+  // Calcula o range de datas para o modo MENSAL
+  const getMonthDateRange = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
     
-    // Primeiro dia do mês
-    const firstDayOfMonth = new Date(year, month, 1);
-    const startingDayOfWeek = firstDayOfMonth.getDay();
+    // Primeiro dia do mês às 00:00:00
+    const firstDay = new Date(year, month, 1, 0, 0, 0);
     
-    // Último dia do mês
-    const lastDayOfMonth = new Date(year, month + 1, 0);
-    const daysInMonth = lastDayOfMonth.getDate();
-    
-    // Calcular total de células necessárias
-    const totalCells = Math.ceil((daysInMonth + startingDayOfWeek) / 7) * 7;
-    const nextMonthDays = totalCells - (daysInMonth + startingDayOfWeek);
-    
-    // Primeiro dia visível (pode ser do mês anterior)
-    const firstVisibleDay = new Date(year, month, 1 - startingDayOfWeek);
-    firstVisibleDay.setHours(0, 1, 0, 0); // 00:01
-    
-    // Último dia visível (pode ser do próximo mês)
-    const lastVisibleDay = new Date(year, month, daysInMonth + nextMonthDays);
-    lastVisibleDay.setHours(23, 59, 59, 999); // 23:59
+    // Último dia do mês às 23:59:59
+    const lastDay = new Date(year, month + 1, 0, 23, 59, 59);
     
     return {
-      data_inicio: firstVisibleDay.toISOString(),
-      data_final: lastVisibleDay.toISOString(),
+      data_inicio: formatDateWithoutTimezone(firstDay),
+      data_final: formatDateWithoutTimezone(lastDay),
+    };
+  };
+
+  // Calcula o range de datas para o modo SEMANAL
+  const getWeekDateRange = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 = domingo, 6 = sábado
+    
+    // Primeiro dia da semana (domingo) às 00:00:00
+    const firstDay = new Date(d);
+    firstDay.setDate(d.getDate() - day);
+    firstDay.setHours(0, 0, 0, 0);
+    
+    // Último dia da semana (sábado) às 23:59:59
+    const lastDay = new Date(firstDay);
+    lastDay.setDate(firstDay.getDate() + 6);
+    lastDay.setHours(23, 59, 59, 999);
+    
+    return {
+      data_inicio: formatDateWithoutTimezone(firstDay),
+      data_final: formatDateWithoutTimezone(lastDay),
+    };
+  };
+
+  // Calcula o range de datas para o modo DIÁRIO
+  const getDayDateRange = (date: Date) => {
+    // Início do dia às 00:00:00
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    // Fim do dia às 23:59:59
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return {
+      data_inicio: formatDateWithoutTimezone(startOfDay),
+      data_final: formatDateWithoutTimezone(endOfDay),
     };
   };
 
@@ -317,7 +361,15 @@ export default function Agenda() {
 
     setLoadingAgendaData(true);
     try {
-      const dateRange = getCalendarDateRange(currentMonth);
+      // Seleciona o range de datas baseado no modo de visualização ativo
+      let dateRange;
+      if (viewMode === 'month') {
+        dateRange = getMonthDateRange(currentMonth);
+      } else if (viewMode === 'week') {
+        dateRange = getWeekDateRange(currentWeekDate);
+      } else {
+        dateRange = getDayDateRange(currentDayDate);
+      }
       
       const body: { 
         tipo_busca: string; 
@@ -334,7 +386,7 @@ export default function Agenda() {
         body.id = agendaId;
       }
 
-      console.log('[Agenda] Buscando dados da agenda com body:', body);
+      console.log(`[Agenda] Buscando dados da agenda (modo: ${viewMode}) com body:`, body);
 
       const response = await fetch('https://webhook.n8nlabz.com.br/webhook/ver-agenda-medx', {
         method: 'POST',
@@ -376,7 +428,7 @@ export default function Agenda() {
     }
   }, [user?.role]);
 
-  // Busca dados da agenda quando a seleção ou mês muda
+  // Busca dados da agenda quando a seleção, modo ou data muda
   useEffect(() => {
     if (user?.role === 'owner' && selectedAgenda) {
       if (selectedAgenda === 'todos') {
@@ -385,7 +437,7 @@ export default function Agenda() {
         fetchAgendaDetails('individual', selectedAgenda);
       }
     }
-  }, [user?.role, selectedAgenda, currentMonth]);
+  }, [user?.role, selectedAgenda, viewMode, currentMonth, currentWeekDate, currentDayDate]);
 
   const handleAppointmentClick = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
@@ -461,81 +513,138 @@ export default function Agenda() {
   // Renderiza a visualização da agenda (calendário)
   const renderAgendaView = () => (
     <div className="space-y-6">
-      {/* Filtro de agendas (apenas para owner) */}
-      {user?.role === 'owner' && (
-        <MagicBentoCard contentClassName="p-6">
+      {/* Filtro de agendas e seletor de visualização */}
+      <MagicBentoCard contentClassName="p-6">
+        <div className="flex flex-col gap-4">
+          {/* Linha 1: Filtro de médico (apenas owner) e Modo de Visualização */}
           <div className="flex flex-col md:flex-row md:items-end gap-4">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="agenda-filter" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Filtrar por Médico
-                {loadingAgendas && (
-                  <span className="text-xs text-muted-foreground">(Carregando...)</span>
-                )}
-              </Label>
-              <Select 
-                value={selectedAgenda} 
-                onValueChange={setSelectedAgenda}
-                disabled={loadingAgendas}
-              >
-                <SelectTrigger id="agenda-filter">
-                  <SelectValue 
-                    placeholder={loadingAgendas ? "Carregando agendas..." : "Selecione um médico"} 
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os Médicos</SelectItem>
-                  {agendas.map((agenda) => (
-                    <SelectItem key={agenda.id} value={agenda.id}>
-                      {agenda.nome}
-                    </SelectItem>
-                  ))}
-                  {!loadingAgendas && agendas.length === 0 && (
-                    <SelectItem value="vazio" disabled>
-                      Nenhuma agenda disponível
-                    </SelectItem>
+            {/* Filtro por médico (apenas para owner) */}
+            {user?.role === 'owner' && (
+              <>
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="agenda-filter" className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtrar por Médico
+                    {loadingAgendas && (
+                      <span className="text-xs text-muted-foreground">(Carregando...)</span>
+                    )}
+                  </Label>
+                  <Select 
+                    value={selectedAgenda} 
+                    onValueChange={setSelectedAgenda}
+                    disabled={loadingAgendas}
+                  >
+                    <SelectTrigger id="agenda-filter">
+                      <SelectValue 
+                        placeholder={loadingAgendas ? "Carregando agendas..." : "Selecione um médico"} 
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Médicos</SelectItem>
+                      {agendas.map((agenda) => (
+                        <SelectItem key={agenda.id} value={agenda.id}>
+                          {agenda.nome}
+                        </SelectItem>
+                      ))}
+                      {!loadingAgendas && agendas.length === 0 && (
+                        <SelectItem value="vazio" disabled>
+                          Nenhuma agenda disponível
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button 
+                  onClick={fetchAgendas} 
+                  disabled={loadingAgendas}
+                  variant="outline"
+                  className="md:w-auto w-full"
+                >
+                  {loadingAgendas ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Atualizando...
+                    </>
+                  ) : (
+                    'Atualizar Lista'
                   )}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <Button 
-              onClick={fetchAgendas} 
-              disabled={loadingAgendas}
-              variant="outline"
-              className="md:w-auto w-full"
-            >
-              {loadingAgendas ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Atualizando...
-                </>
-              ) : (
-                'Atualizar Lista'
-              )}
-            </Button>
+                </Button>
+              </>
+            )}
           </div>
 
-          {/* Status da agenda */}
-          {!loadingAgendaData && externalAppointments.length > 0 && (
-            <div className="mt-4">
+          {/* Linha 2: Modo de Visualização */}
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-sm font-medium">Modo de Visualização:</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={viewMode === 'month' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('month')}
+              >
+                Mensal
+              </Button>
+              <Button
+                variant={viewMode === 'week' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('week')}
+              >
+                Semanal
+              </Button>
+              <Button
+                variant={viewMode === 'day' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('day')}
+              >
+                Diário
+              </Button>
+            </div>
+          </div>
+
+          {/* Status da agenda (apenas owner) */}
+          {user?.role === 'owner' && !loadingAgendaData && externalAppointments.length > 0 && (
+            <div className="pt-2 border-t">
               <p className="text-sm text-green-600 flex items-center gap-2">
                 <span className="inline-block w-2 h-2 bg-green-600 rounded-full"></span>
                 {externalAppointments.length} evento(s) carregado(s) e exibidos no calendário
               </p>
             </div>
           )}
-        </MagicBentoCard>
-      )}
+        </div>
+      </MagicBentoCard>
 
       {/* Calendário */}
       <MagicBentoCard contentClassName="p-0 min-h-[calc(100vh-20rem)]">
         {!loadingAgendaData && (
-          <MonthCalendar
-            appointments={displayedAppointments}
-            onDayClick={handleDayClick}
-            onAppointmentClick={handleAppointmentClick}
-          />
+          <>
+            {viewMode === 'month' && (
+              <MonthCalendar
+                appointments={displayedAppointments}
+                onDayClick={handleDayClick}
+                onAppointmentClick={handleAppointmentClick}
+              />
+            )}
+            {viewMode === 'week' && (
+              <WeekCalendar
+                appointments={displayedAppointments}
+                currentDate={currentWeekDate}
+                onDateChange={setCurrentWeekDate}
+                onDayClick={handleDayClick}
+                onAppointmentClick={handleAppointmentClick}
+              />
+            )}
+            {viewMode === 'day' && (
+              <DayCalendar
+                appointments={displayedAppointments}
+                currentDate={currentDayDate}
+                onDateChange={setCurrentDayDate}
+                onTimeSlotClick={handleDayClick}
+                onAppointmentClick={handleAppointmentClick}
+              />
+            )}
+          </>
         )}
         {loadingAgendaData && (
           <div className="flex items-center justify-center h-full min-h-[400px]">
