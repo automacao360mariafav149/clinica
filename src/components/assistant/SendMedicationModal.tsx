@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Send, FileText, Edit3 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface SendMedicationModalProps {
   open: boolean;
@@ -54,7 +55,8 @@ export function SendMedicationModal({
     setError(null);
 
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/enviar-medicacao', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/enviar-medicacao`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

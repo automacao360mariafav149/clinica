@@ -25,6 +25,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SendMedicationModal } from './SendMedicationModal';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface AgentMedicationModalProps {
   open: boolean;
@@ -117,7 +118,8 @@ export function AgentMedicationModal({ open, onOpenChange }: AgentMedicationModa
       if (gestante) condicoesEspeciais.push('gestante');
       if (lactante) condicoesEspeciais.push('lactante');
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/agent-calc-medicacao', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/agent-calc-medicacao`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

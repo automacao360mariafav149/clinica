@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Plug, User, Calendar, Clock, Phone, Play, Power, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface Instance {
   id?: string;
@@ -69,7 +70,8 @@ export default function Integration() {
     setError(null);
     
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/listar-instancias', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/listar-instancias`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +122,8 @@ export default function Integration() {
     try {
       console.log('🔍 Verificando status da instância:', instanceName);
       
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/listar-instancias', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/listar-instancias`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,7 +216,8 @@ export default function Integration() {
     setActionLoading(prev => ({ ...prev, [`connect-${connectModal.instanceName}`]: true }));
     
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/conectar-instancia', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/conectar-instancia`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,7 +275,8 @@ export default function Integration() {
     setActionLoading(prev => ({ ...prev, [`disconnect-${instanceName}`]: true }));
     
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/desconectar-instancias', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/desconectar-instancias`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -303,7 +308,8 @@ export default function Integration() {
     setActionLoading(prev => ({ ...prev, [`update-${editNameModal.instanceId}`]: true }));
     
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/atualizar-nome-instancia', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/atualizar-nome-instancia`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

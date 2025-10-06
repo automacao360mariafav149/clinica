@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Edit, Calendar, Clock, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -261,7 +262,8 @@ export function EditEventModal({
       console.log('Calendar ID (Agenda):', doctor.calendar_id);
       console.log('Payload completo:', payload);
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/editar-evento', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/editar-evento`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -301,7 +303,8 @@ export function EditEventModal({
 
       console.log('[DeleteEvent] Enviando dados para deletar evento:', payload);
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/deletar-evento', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/deletar-evento`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

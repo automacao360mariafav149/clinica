@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { uploadFile } from '@/lib/storageUtils';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface AgentExamModalProps {
   open: boolean;
@@ -117,7 +118,8 @@ export function AgentExamModal({ open, onOpenChange }: AgentExamModalProps) {
       formData.append('file', selectedFile);
       formData.append('filename', selectedFile.name);
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/agent-exame', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/agent-exame`, {
         method: 'POST',
         body: formData,
       });

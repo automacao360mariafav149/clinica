@@ -9,6 +9,7 @@ import { EditEventModal } from '@/components/agenda/EditEventModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDoctorSchedule, DoctorSchedule as ScheduleType } from '@/hooks/useDoctorSchedule';
 import { supabase } from '@/lib/supabaseClient';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 import { 
   Dialog, 
   DialogContent, 
@@ -167,7 +168,8 @@ export default function Agenda() {
     console.log('[Agenda] Buscando lista de agendas...');
     setLoadingAgendas(true);
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/gestao-agendas', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/gestao-agendas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -435,7 +437,8 @@ export default function Agenda() {
 
       console.log(`[Agenda] Buscando dados da agenda (modo: ${viewMode}) com body:`, body);
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/ver-agenda-medx', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/ver-agenda-medx`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -678,7 +681,8 @@ export default function Agenda() {
       console.log('[Agenda] Deletando evento - Payload:', payload);
       toast.loading('Deletando evento...');
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/apagar-evento', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/apagar-evento`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -816,7 +820,8 @@ export default function Agenda() {
       console.log('Payload completo:', payload);
       toast.loading('Movendo evento...');
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/editar-evento', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/editar-evento`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Plus, Search, User, Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -273,7 +274,8 @@ export function CreateEventModal({
       console.log('[CreateEvent] Enviando dados para criar evento:', payload);
       console.log('[CreateEvent] Calendar ID do médico:', doctor.calendar_id);
 
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/criar-evento', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/criar-evento`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

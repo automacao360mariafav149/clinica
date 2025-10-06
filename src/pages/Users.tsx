@@ -33,6 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserPlus, Calendar, Loader2, Trash2, Link, Clock, Globe, Shield, Video, Palette, Bell, Star, Check, X, Plus, CheckCircle, Edit, User, Mail, Phone, Stethoscope } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 export default function Users() {
   const navigate = useNavigate();
@@ -323,7 +324,8 @@ export default function Users() {
       // Busca o calendar vinculado
       await fetchLinkedCalendar(userId);
       
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/gestao-agendas', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/gestao-agendas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -384,7 +386,8 @@ export default function Users() {
     try {
       console.log('Adicionando calendário. UserId:', userId, 'Nome:', calendarName);
       
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/gestao-agendas', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/gestao-agendas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -440,7 +443,8 @@ export default function Users() {
     try {
       console.log('Deletando calendário. UserId:', userId, 'CalendarId:', calendarId);
       
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/gestao-agendas', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/gestao-agendas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

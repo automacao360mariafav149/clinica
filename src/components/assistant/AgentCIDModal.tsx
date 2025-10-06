@@ -23,6 +23,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface AgentCIDModalProps {
   open: boolean;
@@ -85,7 +86,8 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
     setResultado(null);
 
     try {
-      const response = await fetch('https://webhook.n8nlabz.com.br/webhook/agent-cid', {
+      const apiBaseUrl = await getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/agent-cid`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
