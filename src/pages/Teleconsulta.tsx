@@ -40,14 +40,15 @@ const useAssemblyAITranscription = () => {
       // Conecta ao WebSocket da AssemblyAI (v3) com MESMOS parâmetros do playground
       const wsUrl = new URL('wss://streaming.assemblyai.com/v3/ws');
       wsUrl.searchParams.set('token', token);
-      wsUrl.searchParams.set('sampleRate', '16000'); // Note: camelCase como no playground
-      wsUrl.searchParams.set('formatTurns', 'true'); // camelCase
+      wsUrl.searchParams.set('sample_rate', '16000');
+      wsUrl.searchParams.set('format_turns', 'true');
       wsUrl.searchParams.set('language', 'multi');
+      wsUrl.searchParams.set('encoding', 'pcm_s16le');
       
       // Parâmetros EXATOS do playground (note os valores diferentes!)
-      wsUrl.searchParams.set('endOfTurnConfidenceThreshold', '0.7'); // 0.7 no playground
-      wsUrl.searchParams.set('minEndOfTurnSilenceWhenConfident', '160'); // 160ms no playground!
-      wsUrl.searchParams.set('maxTurnSilence', '2400'); // 2400ms no playground
+      wsUrl.searchParams.set('end_of_turn_confidence_threshold', '0.7');
+      wsUrl.searchParams.set('min_end_of_turn_silence_when_confident', '160');
+      wsUrl.searchParams.set('max_turn_silence', '2400');
       
       // Palavras-chave médicas (pode adicionar mais conforme necessário)
       const medicalKeywords = [
@@ -55,7 +56,8 @@ const useAssemblyAITranscription = () => {
         'tratamento', 'medicamento', 'sintoma', 'dor', 'febre',
         'pressão', 'diabetes', 'hipertensão', 'receita', 'prontuário'
       ];
-      wsUrl.searchParams.set('keytermsPrompt', JSON.stringify(medicalKeywords)); // camelCase
+      // Opcional: melhorar reconhecimento de termos médicos (formato v3)
+      wsUrl.searchParams.set('keyterms_prompt', JSON.stringify(medicalKeywords));
       
       console.log('Conectando ao WebSocket v3 com URL:', wsUrl.toString());
       wsRef.current = new WebSocket(wsUrl.toString());
@@ -71,8 +73,8 @@ const useAssemblyAITranscription = () => {
       const startMediaCapture = async () => {
         if (mediaStarted) return;
         mediaStarted = true;
-        // Inicia captura de áudio somente após sessão iniciar
-        const stream = await navigator.mediaDevices.getUserMedia({ 
+        // Inicia captura do microfone
+        const micStream = await navigator.mediaDevices.getUserMedia({ 
           audio: {
             channelCount: 1,
             sampleRate: 16000,
@@ -81,42 +83,79 @@ const useAssemblyAITranscription = () => {
             autoGainControl: true
           } 
         });
-        
-        // Usa AudioContext para extrair PCM raw de 16-bit
+
+        // Tenta capturar áudio da aba (para incluir o áudio do paciente no iframe)
+        let displayStream: MediaStream | null = null;
+        try {
+          displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        } catch (e) {
+          console.warn('Captura de áudio da aba não autorizada ou não suportada. Apenas microfone será transcrito.');
+        }
+
         const audioContext = new AudioContext({ sampleRate: 16000 });
-        const source = audioContext.createMediaStreamSource(stream);
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
-        
+
+        // Fontes e ganhos para mixar sem clipping
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        const micGain = audioContext.createGain();
+        micGain.gain.value = 0.8;
+        micSource.connect(micGain);
+        micGain.connect(processor);
+
+        let tabSource: MediaStreamAudioSourceNode | null = null;
+        let tabGain: GainNode | null = null;
+        if (displayStream && displayStream.getAudioTracks().length > 0) {
+          try {
+            tabSource = audioContext.createMediaStreamSource(displayStream);
+            tabGain = audioContext.createGain();
+            tabGain.gain.value = 0.8;
+            tabSource.connect(tabGain);
+            tabGain.connect(processor);
+            console.log('Áudio da aba conectado ao mix para transcrição.');
+          } catch (e) {
+            console.warn('Falha ao conectar áudio da aba. Prosseguindo apenas com microfone.');
+          }
+        } else {
+          console.warn('Nenhuma trilha de áudio da aba disponível. Confirme que selecionou "Compartilhar áudio".');
+        }
+
+        // Necessário manter o nó processando
+        processor.connect(audioContext.destination);
+
         let frameCount = 0;
         processor.onaudioprocess = (e) => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             const inputData = e.inputBuffer.getChannelData(0);
-            // Converte Float32 para Int16 PCM (little-endian)
             const pcmData = new Int16Array(inputData.length);
             for (let i = 0; i < inputData.length; i++) {
               const s = Math.max(-1, Math.min(1, inputData[i]));
               pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
             }
-            
+
             frameCount++;
             if (frameCount <= 3) {
               console.log(`Frame ${frameCount} - PCM samples:`, pcmData.length, 'bytes:', pcmData.buffer.byteLength);
               console.log('Primeiros 10 samples PCM:', Array.from(pcmData.slice(0, 10)));
             }
-            
-            // Envia PCM raw como ArrayBuffer (binário)
+
             if (frameCount === 1) {
               console.log('Enviando ArrayBuffer binário, tamanho:', pcmData.buffer.byteLength);
             }
             wsRef.current.send(pcmData.buffer);
           }
         };
-        
-        source.connect(processor);
-        processor.connect(audioContext.destination);
-        
-        // Salva referências para poder parar depois
-        mediaRecorderRef.current = { stream, audioContext, processor, source } as any;
+
+        // Salva referências para limpeza
+        mediaRecorderRef.current = { 
+          micStream, 
+          displayStream, 
+          audioContext, 
+          processor, 
+          micSource, 
+          micGain, 
+          tabSource, 
+          tabGain 
+        } as any;
       };
       
       wsRef.current.onopen = async () => {
@@ -197,21 +236,39 @@ const useAssemblyAITranscription = () => {
     console.log('Transcrição acumulada:', currentTranscript);
     console.log('Tamanho:', currentTranscript.length, 'caracteres');
     
-    // Para a gravação (agora é AudioContext, não MediaRecorder)
+    // Para a gravação (agora usamos WebAudio + múltiplas fontes)
     if (mediaRecorderRef.current) {
       const refs = mediaRecorderRef.current as any;
-      if (refs.processor) {
-        refs.processor.disconnect();
-      }
-      if (refs.source) {
-        refs.source.disconnect();
-      }
-      if (refs.audioContext) {
-        await refs.audioContext.close();
-      }
-      if (refs.stream) {
-        refs.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      }
+      try {
+        if (refs.processor) {
+          refs.processor.disconnect();
+        }
+        if (refs.micGain) {
+          refs.micGain.disconnect();
+        }
+        if (refs.micSource) {
+          refs.micSource.disconnect();
+        }
+        if (refs.tabGain) {
+          refs.tabGain.disconnect();
+        }
+        if (refs.tabSource) {
+          refs.tabSource.disconnect();
+        }
+      } catch {}
+      try {
+        if (refs.audioContext) {
+          await refs.audioContext.close();
+        }
+      } catch {}
+      try {
+        if (refs.micStream) {
+          refs.micStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        }
+        if (refs.displayStream) {
+          refs.displayStream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+        }
+      } catch {}
     }
     
     // Fecha WebSocket
