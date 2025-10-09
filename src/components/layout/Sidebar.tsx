@@ -43,11 +43,14 @@ export const Sidebar = () => {
       label: 'Assistente', 
       roles: ['owner', 'doctor', 'secretary'] 
     },
-    { 
-      path: '/patients', 
-      icon: Users, 
-      label: 'Pacientes', 
-      roles: ['owner', 'doctor', 'secretary'] 
+    {
+      icon: Users,
+      label: 'Pacientes',
+      roles: ['owner', 'doctor', 'secretary'],
+      children: [
+        { path: '/patients', label: 'Pacientes CRM' },
+        { path: '/pre-patients', label: 'Pré Pacientes' }
+      ]
     },
     { 
       path: '/whatsapp', 
@@ -97,20 +100,46 @@ export const Sidebar = () => {
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {visibleItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-              }`
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="text-sm font-medium">{item.label}</span>
-          </NavLink>
+          item.children ? (
+            <div key={item.label} className="space-y-1">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sidebar-foreground">
+                <item.icon className="w-5 h-5" />
+                <span className="text-sm font-medium">{item.label}</span>
+              </div>
+              <div className="ml-6 space-y-1">
+                {item.children.map((child: any) => (
+                  <NavLink
+                    key={child.path}
+                    to={child.path}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+                        isActive
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          : 'text-sidebar-foreground/90 hover:bg-sidebar-accent/50'
+                      }`
+                    }
+                  >
+                    <span className="text-xs font-medium">{child.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                  isActive
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                }`
+              }
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-sm font-medium">{item.label}</span>
+            </NavLink>
+          )
         ))}
       </nav>
 

@@ -144,14 +144,27 @@ export default function Patients() {
     }
   };
 
+  const formatWhatsappToDDDNumber = (raw?: string | null) => {
+    if (!raw) return '-';
+    const atIdx = raw.indexOf('@');
+    const withoutDomain = atIdx >= 0 ? raw.slice(0, atIdx) : raw;
+    const digits = withoutDomain.replace(/\D/g, '');
+    if (!digits) return '-';
+    const local = digits.length > 11 ? digits.slice(-11) : digits;
+    if (local.length < 10) return local;
+    const ddd = local.slice(0, 2);
+    const number = local.slice(2);
+    return `(${ddd}) ${number}`;
+  };
+
   return (
     <DashboardLayout>
       <div className="p-8 space-y-8">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Pacientes</h1>
-            <p className="text-muted-foreground mt-1">Sistema de gestão de pacientes (CRM)</p>
+            <h1 className="text-3xl font-bold text-foreground">Pacientes CRM</h1>
+            <p className="text-muted-foreground mt-1">Sistema de gestão de pacientes</p>
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -223,7 +236,7 @@ export default function Patients() {
                           </p>
                         )}
                         {patient.phone && (
-                          <p className="text-sm text-muted-foreground">{patient.phone}</p>
+                          <p className="text-sm text-muted-foreground">{formatWhatsappToDDDNumber(patient.phone)}</p>
                         )}
                         {!patient.email && !patient.phone && <span className="text-muted-foreground">-</span>}
                       </div>
