@@ -16,6 +16,7 @@ export default function Dashboard() {
   // Listas mínimas só para obter contagens reativas
   const { data: appointments } = useRealtimeList<any>({ table: 'appointments' });
   const { data: patients } = useRealtimeList<any>({ table: 'patients' });
+  const { data: prePatients } = useRealtimeList<any>({ table: 'pre_patients' });
 
   const stats = [
     {
@@ -26,9 +27,9 @@ export default function Dashboard() {
       icon: Calendar,
       trend: '+0%'
     },
-    { title: 'Pacientes Ativos', value: String(patients.length), icon: Users, trend: '+0%' },
+    { title: 'Pacientes CRM', value: String(patients.length), icon: Users, trend: '+0%' },
+    { title: 'Pré Pacientes', value: String(prePatients.length), icon: Activity, trend: '+0%' },
     { title: 'Taxa de Ocupação', value: '—', icon: TrendingUp, trend: '+0%' },
-    { title: 'Tempo Médio', value: '—', icon: Clock, trend: '0%' },
   ];
 
   return (
