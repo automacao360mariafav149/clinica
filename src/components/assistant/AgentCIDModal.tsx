@@ -216,7 +216,7 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col gap-0 p-0">
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col gap-0 p-0">
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-border/50">
@@ -231,9 +231,9 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           {/* Área com Scroll quando necessário */}
-          <div className="overflow-y-auto px-6 py-4 space-y-6">
+          <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
             {/* Campo de Termo */}
             <div className="space-y-2">
               <Label htmlFor="termo">Termo de Busca *</Label>
@@ -292,16 +292,16 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
 
             {/* Resultado */}
             {resultado && (
-              <div className="rounded-lg border bg-gradient-to-br from-blue-500/5 to-cyan-500/5 p-6 space-y-4 mb-4">
+              <div className="rounded-lg border bg-gradient-to-br from-blue-500/5 to-cyan-500/5 p-4 space-y-3">
                 {/* Cabeçalho do Resultado */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <h4 className="font-bold text-lg">CID Encontrado</h4>
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <h4 className="font-bold text-base">CID Encontrado</h4>
                     </div>
                     <div className="flex items-baseline gap-3 flex-wrap">
-                      <span className="text-4xl font-bold text-blue-600 dark:text-blue-400">
+                      <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                         {resultado.codigo_cid}
                       </span>
                       <Badge 
@@ -310,7 +310,7 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                           resultado.confianca === 'MÉDIA' ? 'secondary' : 
                           'outline'
                         }
-                        className="text-sm px-3 py-1"
+                        className="text-xs px-2 py-0.5"
                       >
                         Confiança: {resultado.confianca}
                       </Badge>
@@ -321,14 +321,14 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                 <Separator />
 
                 {/* Descrição */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <FileSearch className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold text-muted-foreground">
+                    <FileSearch className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">
                       Descrição
                     </span>
                   </div>
-                  <p className="text-base font-medium leading-relaxed">
+                  <p className="text-sm font-medium leading-snug">
                     {resultado.descricao}
                   </p>
                 </div>
@@ -336,14 +336,14 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                 <Separator />
 
                 {/* Categoria */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold text-muted-foreground">
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">
                       Categoria
                     </span>
                   </div>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
+                  <p className="text-xs leading-snug text-muted-foreground">
                     {resultado.categoria}
                   </p>
                 </div>
@@ -351,15 +351,15 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                 <Separator />
 
                 {/* Observações */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-semibold text-muted-foreground">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-xs font-semibold text-muted-foreground">
                       Observações Clínicas
                     </span>
                   </div>
-                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <p className="text-sm leading-relaxed">
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs leading-snug">
                       {resultado.observacoes}
                     </p>
                   </div>
@@ -368,15 +368,15 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                 <Separator />
 
                 {/* Processo de Pensamento */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm font-semibold text-muted-foreground">
+                    <Lightbulb className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-xs font-semibold text-muted-foreground">
                       Processo de Análise
                     </span>
                   </div>
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                    <p className="text-sm leading-relaxed italic">
+                  <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                    <p className="text-xs leading-snug italic">
                       {resultado.processo_pensamento}
                     </p>
                   </div>
@@ -390,45 +390,46 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                     <Button
                       type="button"
                       variant="outline"
+                      size="sm"
                       onClick={() => setShowPatientSelect(true)}
                       className="gap-2"
                     >
-                      <UserPlus className="w-4 h-4" />
+                      <UserPlus className="w-3.5 h-3.5" />
                       Vincular a um Paciente
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4 p-4 rounded-lg bg-muted/50 border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link2 className="w-4 h-4 text-primary" />
-                      <h5 className="font-semibold text-sm">Vincular ao Prontuário</h5>
+                  <div className="space-y-3 p-3 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="w-3.5 h-3.5 text-primary" />
+                      <h5 className="font-semibold text-xs">Vincular ao Prontuário</h5>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="patient-select">Selecione o Paciente</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="patient-select" className="text-xs">Selecione o Paciente</Label>
                       <Select 
                         value={selectedPatientId} 
                         onValueChange={setSelectedPatientId}
                         disabled={savingToPatient}
                       >
-                        <SelectTrigger id="patient-select">
+                        <SelectTrigger id="patient-select" className="h-8 text-xs">
                           <SelectValue placeholder="Escolha um paciente..." />
                         </SelectTrigger>
                         <SelectContent>
                           {patients.length === 0 ? (
-                            <div className="p-2 text-sm text-muted-foreground text-center">
+                            <div className="p-2 text-xs text-muted-foreground text-center">
                               Nenhum paciente cadastrado
                             </div>
                           ) : (
                             patients.map((patient) => (
-                              <SelectItem key={patient.id} value={patient.id}>
+                              <SelectItem key={patient.id} value={patient.id} className="text-xs">
                                 {patient.name}
                               </SelectItem>
                             ))
                           )}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] text-muted-foreground">
                         Esta consulta será salva no prontuário do paciente selecionado
                       </p>
                     </div>
@@ -438,6 +439,7 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="h-7 text-xs"
                         onClick={() => {
                           setShowPatientSelect(false);
                           setSelectedPatientId('');
@@ -449,18 +451,19 @@ export function AgentCIDModal({ open, onOpenChange }: AgentCIDModalProps) {
                       <Button
                         type="button"
                         size="sm"
+                        className="h-7 text-xs"
                         onClick={handleVincularPaciente}
                         disabled={!selectedPatientId || savingToPatient}
                       >
                         {savingToPatient ? (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
                             Salvando...
                           </>
                         ) : (
                           <>
-                            <Link2 className="w-4 h-4 mr-2" />
-                            Confirmar Vinculação
+                            <Link2 className="w-3 h-3 mr-1.5" />
+                            Confirmar
                           </>
                         )}
                       </Button>
