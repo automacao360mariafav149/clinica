@@ -35,7 +35,7 @@ export const DashboardLayout = ({ children, requiredRoles }: DashboardLayoutProp
       </div>
       
       <Sidebar />
-      <main className="flex-1 h-full overflow-hidden relative z-10">
+      <main className="flex-1 h-full overflow-y-auto relative z-10">
         {children}
       </main>
     </div>
