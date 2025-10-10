@@ -11,7 +11,10 @@ import { listMedxSessions, listMessagesBySession, extractMessageText, MedxHistor
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { User, Play, Pause } from 'lucide-react';
+import { User, Play, Pause, FileText, Bell, Stethoscope } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { SummaryModal } from '@/components/whatsapp/SummaryModal';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -291,6 +294,34 @@ export default function WhatsApp() {
     return classifiedSessions.find((s: any) => s.sessionId === selectedSessionId) ?? null;
   }, [classifiedSessions, selectedSessionId]);
 
+  // Buscar telefone do paciente/pre-paciente da sessão (se tivermos nas tabelas)
+  const [patientPhone, setPatientPhone] = useState<string | null>(null);
+  useEffect(() => {
+    const fetchPhone = async () => {
+      if (!selectedSessionId) { setPatientPhone(null); return; }
+      try {
+        // Tenta em patients
+        const p = await supabase.from('patients').select('phone').eq('id', selectedSessionId).maybeSingle();
+        if (!p.error && p.data && (p.data as any)?.phone) {
+          setPatientPhone((p.data as any).phone as string);
+          return;
+        }
+        // Tenta em pre_patients
+        const pp = await supabase.from('pre_patients').select('phone').eq('id', selectedSessionId).maybeSingle();
+        if (!pp.error && pp.data) {
+          setPatientPhone(((pp.data as any)?.phone as string) || null);
+          return;
+        }
+        setPatientPhone(null);
+      } catch {
+        setPatientPhone(null);
+      }
+    };
+    fetchPhone();
+  }, [selectedSessionId]);
+
+  const [summaryOpen, setSummaryOpen] = useState(false);
+
   const filteredSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
     let list = classifiedSessions;
@@ -309,31 +340,27 @@ export default function WhatsApp() {
 
   return (
     <DashboardLayout requiredRoles={['owner', 'secretary']}>
-      <div className="h-[calc(100vh-80px)] p-6">
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-foreground">WhatsApp</h1>
-          <p className="text-muted-foreground mt-1">Conversas por sessão (medx_history)</p>
-        </div>
+      <div className="h-full overflow-hidden p-4">
 
         <Card className="h-full overflow-hidden">
           <div className="h-full min-h-0 grid grid-cols-[320px_1fr]">
             {/* Sidebar de conversas */}
-            <div className="border-r p-3 flex flex-col min-h-0">
+            <div className="border-r flex flex-col min-h-0 p-4">
               <div className="flex gap-2 mb-3">
                 <button
-                  className={`text-xs px-3 py-1 rounded-full ${tab === 'all' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'all' ? 'bg-accent' : 'hover:bg-accent/50'}`}
                   onClick={() => setTab('all')}
                 >
                   Todos
                 </button>
                 <button
-                  className={`text-xs px-3 py-1 rounded-full ${tab === 'pre' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'pre' ? 'bg-accent' : 'hover:bg-accent/50'}`}
                   onClick={() => setTab('pre')}
                 >
                   Pré Pacientes
                 </button>
                 <button
-                  className={`text-xs px-3 py-1 rounded-full ${tab === 'crm' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'crm' ? 'bg-accent' : 'hover:bg-accent/50'}`}
                   onClick={() => setTab('crm')}
                 >
                   Pacientes CRM
@@ -388,8 +415,8 @@ export default function WhatsApp() {
             </div>
 
             {/* Painel de mensagens */}
-            <div className="flex flex-col h-full min-h-0">
-              <div className="px-4 py-3 border-b flex items-center gap-3">
+            <div className="flex flex-col h-full min-h-0 p-4">
+              <div className="px-4 py-3 -mx-4 border-b flex items-center gap-3">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback>{selectedSession ? (selectedSession.kind === 'pre_patient' ? 'PP' : ((selectedSession.displayName ?? selectedSession.sessionId)?.slice(0, 2).toUpperCase())) : (selectedSessionId?.slice(0, 2).toUpperCase() ?? '')}</AvatarFallback>
                 </Avatar>
@@ -397,9 +424,55 @@ export default function WhatsApp() {
                   <div className="text-sm font-semibold truncate">{selectedSession ? (selectedSession.kind === 'pre_patient' ? 'Pré Paciente' : (selectedSession.displayName ?? selectedSession.sessionId)) : (selectedSessionId ?? 'Selecione uma conversa')}</div>
                   <div className="text-xs text-muted-foreground">{messages.length} mensagens</div>
                 </div>
+                <TooltipProvider delayDuration={80} skipDelayDuration={200}>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSummaryOpen(true)}
+                          aria-label="Gerar resumo"
+                          className="transition-transform duration-200 hover:scale-110 hover:text-primary"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Gerar resumo</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {}}
+                        aria-label="Fazer follow up"
+                        className="transition-transform duration-200 hover:scale-110 hover:text-primary"
+                      >
+                        <Bell className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Fazer follow up</TooltipContent>
+                  </Tooltip>
+                    <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {}}
+                        aria-label="Atribuir a médico"
+                        className="transition-transform duration-200 hover:scale-110 hover:text-primary"
+                      >
+                        <Stethoscope className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Atribuir a médico</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </div>
 
-              <ScrollArea className="flex-1 min-h-0 px-4 py-4">
+              <ScrollArea className="flex-1 min-h-0 px-4 py-4 -mx-4">
                 <div className="space-y-3">
                   {loadingMessages && (
                     <div className="text-sm text-muted-foreground">Carregando mensagens…</div>
@@ -446,13 +519,14 @@ export default function WhatsApp() {
                 </div>
               </ScrollArea>
 
-              <div className="px-4 py-3 border-t bg-background/50">
+              <div className="px-4 py-3 -mx-4 border-t bg-background/50">
                 <div className="text-xs text-muted-foreground">Somente leitura a partir de medx_history</div>
               </div>
             </div>
           </div>
         </Card>
       </div>
+      <SummaryModal open={summaryOpen} onOpenChange={setSummaryOpen} sessionId={selectedSessionId} patientPhone={patientPhone} />
     </DashboardLayout>
   );
 }
