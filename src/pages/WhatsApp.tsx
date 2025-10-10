@@ -11,7 +11,7 @@ import { listMedxSessions, listMessagesBySession, extractMessageText, MedxHistor
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { User, Play, Pause, FileText, Bell, Stethoscope } from 'lucide-react';
+import { User, Play, Pause, FileText, Bell, Stethoscope, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { SummaryModal } from '@/components/whatsapp/SummaryModal';
@@ -321,6 +321,24 @@ export default function WhatsApp() {
   }, [selectedSessionId]);
 
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [messageText, setMessageText] = useState('');
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedSessionId) return;
+    
+    // TODO: Implementar lógica de envio de mensagem
+    console.log('Enviando mensagem:', messageText, 'para sessão:', selectedSessionId);
+    
+    // Limpar campo após envio
+    setMessageText('');
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   const filteredSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -520,7 +538,24 @@ export default function WhatsApp() {
               </ScrollArea>
 
               <div className="px-4 py-3 -mx-4 border-t bg-background/50">
-                <div className="text-xs text-muted-foreground">Somente leitura a partir de medx_history</div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Digite sua mensagem..."
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    disabled={!selectedSessionId}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!messageText.trim() || !selectedSessionId}
+                    size="icon"
+                    className="shrink-0"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
