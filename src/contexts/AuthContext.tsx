@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -24,70 +24,68 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Timeout util para evitar operações que podem ficar pendentes indefinidamente
- */
-function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(timeoutMessage)), ms);
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
-
-
-/**
  * Mapeia um usuário do Supabase Auth para o formato da aplicação.
- * SEMPRE busca dados atualizados da tabela profiles para evitar problemas de cache.
- * Não confia em user_metadata que pode estar desatualizado.
- * Usa RPC para melhor confiabilidade.
+ * Usa query direta na tabela profiles para evitar timeouts com RPC.
  */
 async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
-  console.log('[DEBUG] Iniciando busca de perfil...');
-  console.time('[DEBUG] Tempo total da RPC');
+  console.log('[AuthContext] Buscando perfil do usuário:', supaUser.id);
   
-  const rpcPromise = supabase.rpc('get_current_user_profile');
-  const { data: profiles, error } = await withTimeout(rpcPromise, 15000, 'Timeout ao buscar perfil do usuário');
-  
-  console.timeEnd('[DEBUG] Tempo total da RPC');
-  console.log('[DEBUG] Resultado da RPC:', profiles);
-  console.log('[DEBUG] Erro da RPC:', error);
+  // Query simples e direta na tabela profiles
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('auth_user_id', supaUser.id)
+    .single();
   
   if (error) {
     console.error('[AuthContext] Erro ao buscar perfil:', error);
     throw new Error(`Erro ao buscar perfil: ${error.message}`);
   }
 
-  const profile = profiles && profiles.length > 0 ? profiles[0] : null;
-
   if (!profile) {
     console.error('[AuthContext] Nenhum perfil encontrado');
     throw new Error('Seu perfil não foi encontrado no sistema. Entre em contato com o administrador.');
   }
 
-  console.log('[DEBUG] Perfil encontrado:', profile);
+  console.log('[AuthContext] Perfil encontrado:', profile);
 
   return {
-    id: (profile as { id?: string }).id || supaUser.id,
+    id: profile.id || supaUser.id,
     auth_id: supaUser.id,
     email: supaUser.email || '',
-    name: (profile as { name?: string }).name || supaUser.email || 'Usuário',
-    role: (profile as { role?: UserRole }).role || 'doctor',
+    name: profile.name || supaUser.email || 'Usuário',
+    role: profile.role || 'doctor',
   };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // useRef para persistir flag entre renders e evitar race conditions
+  const isProcessingRef = useRef(false);
+  const lastProcessedTimeRef = useRef(0);
+  
+  // Debounce de 500ms para evitar múltiplas chamadas simultâneas
+  const DEBOUNCE_MS = 500;
 
   // Função para atualizar os dados do usuário a partir do Supabase
   const refreshUser = async () => {
+    // Debounce
+    const now = Date.now();
+    if (now - lastProcessedTimeRef.current < DEBOUNCE_MS) {
+      console.log('[AuthContext] Refresh ignorado (debounce)');
+      return;
+    }
+    
+    if (isProcessingRef.current) {
+      console.log('[AuthContext] Refresh já em andamento, ignorando...');
+      return;
+    }
+    
+    isProcessingRef.current = true;
+    lastProcessedTimeRef.current = now;
+    
     try {
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
@@ -99,19 +97,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
       }
     } catch (error) {
-      console.error('Erro ao atualizar dados do usuário:', error);
-      // Em caso de erro, fazer logout para evitar estado inconsistente
-      await supabase.auth.signOut();
-      setUser(null);
+      console.error('[AuthContext] Erro ao atualizar dados do usuário:', error);
+      // NÃO fazer logout automático em caso de erro - pode ser apenas timeout temporário
+      // Apenas logar o erro e manter o estado atual
+    } finally {
+      isProcessingRef.current = false;
     }
   };
 
   useEffect(() => {
-    let isProcessing = false; // Flag para prevenir chamadas duplicadas
-  
     const init = async () => {
-      if (isProcessing) return;
-      isProcessing = true;
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
   
       try {
         const { data } = await supabase.auth.getSession();
@@ -120,33 +117,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const mapped = await mapSupabaseUserToAppUser(currentUser);
           setUser(mapped);
         }
+      } catch (error) {
+        console.error('[AuthContext] Erro ao carregar sessão inicial:', error);
       } finally {
-        isProcessing = false;
+        setIsLoading(false);
+        isProcessingRef.current = false;
       }
     };
   
     init();
   
+    // onAuthStateChange simplificado: apenas SIGNED_IN e SIGNED_OUT
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (isProcessing) return; // Previne processamento duplicado
-      isProcessing = true;
+      console.log('[AuthContext] Auth event:', event);
+      
+      // Ignorar eventos que não sejam SIGNED_IN ou SIGNED_OUT
+      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
+        console.log('[AuthContext] Evento ignorado:', event);
+        return;
+      }
+      
+      // Debounce
+      const now = Date.now();
+      if (now - lastProcessedTimeRef.current < DEBOUNCE_MS) {
+        console.log('[AuthContext] Evento ignorado (debounce)');
+        return;
+      }
+      
+      if (isProcessingRef.current) {
+        console.log('[AuthContext] Processamento já em andamento, ignorando evento');
+        return;
+      }
+      
+      isProcessingRef.current = true;
+      lastProcessedTimeRef.current = now;
   
       try {
-        console.log('[AuthContext] Mudança de estado de autenticação:', event);
-        const currentUser = session?.user;
-  
-        if (currentUser && event !== 'SIGNED_OUT') {
-          console.log('[AuthContext] Usuário autenticado, carregando perfil...');
-          const mapped = await mapSupabaseUserToAppUser(currentUser);
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('[AuthContext] SIGNED_IN: Carregando perfil...');
+          const mapped = await mapSupabaseUserToAppUser(session.user);
           setUser(mapped);
-        } else {
+        } else if (event === 'SIGNED_OUT') {
+          console.log('[AuthContext] SIGNED_OUT: Limpando usuário');
           setUser(null);
         }
       } catch (error) {
-        console.error('[AuthContext] Erro ao atualizar usuário após mudança de estado:', error);
-        setUser(null);
+        console.error('[AuthContext] Erro ao processar mudança de autenticação:', error);
+        // NÃO limpar usuário em caso de erro - pode ser timeout temporário
       } finally {
-        isProcessing = false;
+        isProcessingRef.current = false;
       }
     });
   
@@ -163,12 +182,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('[AuthContext] Iniciando login para:', email);
     
     try {
-      // Autenticação com timeout de 60 segundos (generoso)
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email, password }),
-        60000,
-        'Tempo esgotado ao autenticar. Verifique sua conexão e tente novamente.'
-      );
+      // Autenticação sem timeout - deixar o Supabase gerenciar
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
         console.error('[AuthContext] Erro na autenticação:', error);
@@ -231,38 +246,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     try {
+      console.log('[AuthContext] Iniciando logout...');
+      
       // Limpa o usuário imediatamente para melhor UX
       setUser(null);
       
-      // Faz o signOut do Supabase (limpa localStorage)
+      // Faz o signOut do Supabase (ele já gerencia a limpeza do storage)
       await supabase.auth.signOut();
       
-      // Força limpeza de qualquer cache residual (tanto localStorage quanto sessionStorage)
-      if (typeof window !== 'undefined') {
-        // Limpa qualquer item relacionado ao Supabase no localStorage
-        const localKeysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('sb-')) {
-            localKeysToRemove.push(key);
-          }
-        }
-        localKeysToRemove.forEach(key => localStorage.removeItem(key));
-        
-        // Também limpa sessionStorage por precaução
-        const sessionKeysToRemove: string[] = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const key = sessionStorage.key(i);
-          if (key && key.startsWith('sb-')) {
-            sessionKeysToRemove.push(key);
-          }
-        }
-        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
-      }
-      
-      console.log('Logout realizado com sucesso');
+      console.log('[AuthContext] Logout realizado com sucesso');
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error('[AuthContext] Erro ao fazer logout:', error);
       // Garante que o usuário seja limpo mesmo em caso de erro
       setUser(null);
     }
