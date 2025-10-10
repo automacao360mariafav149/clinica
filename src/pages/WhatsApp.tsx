@@ -11,11 +11,189 @@ import { listMedxSessions, listMessagesBySession, extractMessageText, MedxHistor
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { User } from 'lucide-react';
+import { User, Play, Pause } from 'lucide-react';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 const APP_TZ = 'America/Sao_Paulo';
+
+function getMediaKind(url: string): 'image' | 'audio' | 'video' | 'pdf' | 'doc' | 'other' {
+  const u = (url || '').toLowerCase();
+  if (u.match(/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/)) return 'image';
+  if (u.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/)) return 'audio';
+  if (u.match(/\.(mp4|webm|ogg)(\?.*)?$/)) return 'video';
+  if (u.endsWith('.pdf')) return 'pdf';
+  if (u.match(/\.(doc|docx|xls|xlsx|ppt|pptx)(\?.*)?$/)) return 'doc';
+  return 'other';
+}
+
+function cleanTranscriptText(text?: string): string | undefined {
+  if (!text) return text;
+  const trimmed = text.trim();
+  // Remove prefixo "Audio recebido:" no início da string (case-insensitive), com espaços opcionais
+  return trimmed.replace(/^audio\s+recebido\s*:\s*/i, '');
+}
+
+function MediaPreview({ url, transcriptText }: { url: string; transcriptText?: string }) {
+  const kind = getMediaKind(url);
+  if (kind === 'image') {
+    return (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt="imagem" className="max-w-full rounded-md border mb-1" />
+      </a>
+    );
+  }
+  if (kind === 'audio') {
+    return <AudioBubble url={url} transcriptText={cleanTranscriptText(transcriptText)} />;
+  }
+  if (kind === 'video') {
+    return (
+      <video controls className="w-full rounded-md border">
+        <source src={url} />
+        Seu navegador não suporta vídeo.
+      </video>
+    );
+  }
+  if (kind === 'pdf') {
+    return (
+      <div className="space-y-1">
+        <iframe
+          src={url}
+          className="w-full h-64 rounded-md border"
+          title="Pré-visualização PDF"
+        />
+        <a href={url} target="_blank" rel="noreferrer" className="underline">
+          Abrir PDF em nova guia
+        </a>
+      </div>
+    );
+  }
+  // doc e outros: mostrar link simples
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="underline">
+      Abrir arquivo
+    </a>
+  );
+}
+
+function formatTime(totalSeconds: number): string {
+  if (!isFinite(totalSeconds) || totalSeconds < 0) return '00:00';
+  const m = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const s = Math.floor(totalSeconds % 60)
+    .toString()
+    .padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function AudioBubble({ url, transcriptText }: { url: string; transcriptText?: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [current, setCurrent] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const audioRef = useMemo(() => new Audio(url), [url]);
+
+  useEffect(() => {
+    const audio = audioRef;
+    audio.preload = 'metadata';
+    audio.playbackRate = playbackRate;
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onTime = () => setCurrent(audio.currentTime || 0);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrent(audio.duration || 0);
+    };
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('ended', onEnded);
+    return () => {
+      audio.pause();
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, [audioRef, playbackRate]);
+
+  const toggle = async () => {
+    try {
+      if (isPlaying) {
+        audioRef.pause();
+        setIsPlaying(false);
+      } else {
+        await audioRef.play();
+        setIsPlaying(true);
+      }
+    } catch {}
+  };
+
+  const pct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+
+  const onScrub = (value: number) => {
+    if (!isFinite(value)) return;
+    const clamped = Math.max(0, Math.min(duration || 0, value));
+    setCurrent(clamped);
+    audioRef.currentTime = clamped;
+  };
+
+  const cycleRate = () => {
+    const rates = [1, 1.5, 2];
+    const idx = rates.indexOf(playbackRate);
+    const next = rates[(idx + 1) % rates.length];
+    setPlaybackRate(next);
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center shadow"
+        aria-label={isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
+      >
+        {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+      </button>
+      <div className="flex-1 min-w-[160px] max-w-[260px]">
+        <input
+          type="range"
+          min={0}
+          max={duration || 0}
+          step="0.01"
+          value={current}
+          onChange={(e) => onScrub(parseFloat(e.target.value))}
+          className="w-full accent-current"
+        />
+        <div className="mt-1 text-[10px] opacity-80 flex items-center justify-between">
+          <span>{formatTime(current)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+        {transcriptText && (
+          <button
+            type="button"
+            onClick={() => setShowTranscript((v) => !v)}
+            className="mt-2 text-[11px] underline"
+          >
+            {showTranscript ? 'Ocultar transcrição' : 'Exibir transcrição'}
+          </button>
+        )}
+        {showTranscript && transcriptText && (
+          <div className="mt-2 text-xs whitespace-pre-wrap break-words break-all opacity-90">
+            {transcriptText}
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={cycleRate}
+        className="text-[10px] px-2 py-1 rounded bg-white text-black shadow"
+        aria-label={`Velocidade ${playbackRate}x`}
+      >
+        {playbackRate}x
+      </button>
+    </div>
+  );
+}
 
 export default function WhatsApp() {
   const queryClient = useQueryClient();
@@ -250,7 +428,11 @@ export default function WhatsApp() {
                           <div className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words break-all ${
                             isAi ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm'
                           }`}>
-                            <div>{text}</div>
+                            {m.media ? (
+                              <MediaPreview url={m.media} transcriptText={text} />
+                            ) : (
+                              <div>{text}</div>
+                            )}
                             {current && (
                               <div className={`mt-1 text-[10px] opacity-70 ${isAi ? 'text-primary-foreground' : 'text-foreground/70'}`}>
                                 {current.format('HH:mm')}

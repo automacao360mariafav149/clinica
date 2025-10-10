@@ -5,6 +5,7 @@ export type MedxHistoryRow = {
   session_id: string;
   message: any;
   data_e_hora?: string; // timestamptz
+  media?: string | null; // URL
 };
 
 export type MedxSession = {
@@ -97,7 +98,7 @@ export async function listMedxSessions(limitRows: number = 500): Promise<MedxSes
 export async function listMessagesBySession(sessionId: string): Promise<MedxHistoryRow[]> {
   const { data, error } = await supabase
     .from('medx_history')
-    .select('id, session_id, message, data_e_hora')
+    .select('id, session_id, message, data_e_hora, media')
     .eq('session_id', sessionId)
     .order('id', { ascending: true });
 
