@@ -71,6 +71,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Função para atualizar os dados do usuário a partir do Supabase
   const refreshUser = async () => {
+    console.log('[AuthContext] 🔄 refreshUser chamado');
+    
     // Debounce
     const now = Date.now();
     if (now - lastProcessedTimeRef.current < DEBOUNCE_MS) {
@@ -87,21 +89,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastProcessedTimeRef.current = now;
     
     try {
+      console.log('[AuthContext] Buscando sessão atual...');
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
       
       if (currentUser) {
+        console.log('[AuthContext] Sessão encontrada, mapeando perfil...');
         const mapped = await mapSupabaseUserToAppUser(currentUser);
+        console.log('[AuthContext] ✅ Perfil mapeado:', mapped);
+        console.log('[AuthContext] Atualizando estado do user...');
         setUser(mapped);
+        console.log('[AuthContext] ✅ Estado atualizado com sucesso!');
       } else {
+        console.log('[AuthContext] ⚠️ Nenhuma sessão ativa');
         setUser(null);
       }
     } catch (error) {
-      console.error('[AuthContext] Erro ao atualizar dados do usuário:', error);
+      console.error('[AuthContext] ❌ Erro ao atualizar dados do usuário:', error);
       // NÃO fazer logout automático em caso de erro - pode ser apenas timeout temporário
       // Apenas logar o erro e manter o estado atual
     } finally {
       isProcessingRef.current = false;
+      console.log('[AuthContext] refreshUser finalizado');
     }
   };
 
@@ -220,7 +229,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Assina mudanças do perfil do usuário atual para refletir role/name em tempo real
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.auth_id) {
+      console.log('[Realtime] Sem user.auth_id, não criando canal');
+      return;
+    }
+    
+    console.log('[Realtime] Criando canal para auth_id:', user.auth_id);
+    console.log('[Realtime] Dados do user:', { id: user.id, auth_id: user.auth_id, name: user.name, role: user.role });
     
     const channel = supabase
       .channel('realtime:profiles:self')
@@ -232,17 +247,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           table: 'profiles', 
           filter: `auth_user_id=eq.${user.auth_id}` 
         }, 
-        async () => {
-          console.log('Perfil alterado, atualizando dados do usuário...');
-          await refreshUser();
+        (payload) => {
+          console.log('[Realtime] ✅ Mudança detectada no perfil!');
+          console.log('[Realtime] Payload:', payload);
+          console.log('[Realtime] Chamando refreshUser...');
+          refreshUser();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Status da subscription:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] ✅ Canal ativo e escutando mudanças');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] ❌ Erro no canal');
+        } else if (status === 'TIMED_OUT') {
+          console.error('[Realtime] ❌ Timeout na conexão');
+        }
+      });
 
     return () => {
+      console.log('[Realtime] Removendo canal');
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.auth_id]); // Dependência correta: user.auth_id
 
   const logout = async () => {
     try {

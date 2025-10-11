@@ -41,21 +41,28 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
   const hasLoadedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    console.log(`[useRealtimeList] 🔄 Montando hook para tabela: ${table}`);
+    console.log(`[useRealtimeList] Parâmetros:`, { schema, select, order, limit, filters });
+    
     let isMounted = true;
     setLoading(true);
     setError(null);
 
     async function fetchInitial() {
+      console.log(`[useRealtimeList] 📡 Iniciando fetch para ${table}...`);
+      
       let query = supabase.from(table).select(select, { count: 'exact', head: false });
 
       // Aplica filtros se fornecidos
       if (filters && filters.length > 0) {
+        console.log(`[useRealtimeList] Aplicando ${filters.length} filtro(s)`);
         filters.forEach((filter) => {
           query = query[filter.operator](filter.column, filter.value);
         });
       }
 
       if (order) {
+        console.log(`[useRealtimeList] Ordenando por: ${order.column} (${order.ascending ? 'ASC' : 'DESC'})`);
         query = query.order(order.column, {
           ascending: order.ascending ?? true,
           nullsFirst: order.nullsFirst ?? false,
@@ -63,15 +70,24 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
       }
 
       if (limit) {
+        console.log(`[useRealtimeList] Limitando a ${limit} registros`);
         query = query.limit(limit);
       }
 
       const { data: rows, error: fetchError } = await query;
-      if (!isMounted) return;
+      console.log(`[useRealtimeList] ✅ Fetch concluído para ${table}:`, { rowCount: rows?.length, error: fetchError });
+      
+      if (!isMounted) {
+        console.log(`[useRealtimeList] ⚠️ Componente desmontado, ignorando resultado`);
+        return;
+      }
+      
       if (fetchError) {
+        console.error(`[useRealtimeList] ❌ Erro ao buscar ${table}:`, fetchError);
         setError(fetchError.message);
         setData([]);
       } else {
+        console.log(`[useRealtimeList] ✅ ${rows?.length || 0} registros carregados para ${table}`);
         setData((rows as unknown as T[]) ?? []);
       }
       setLoading(false);
@@ -80,9 +96,12 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
 
     fetchInitial();
 
+    console.log(`[useRealtimeList] 📡 Criando canal realtime para ${table}`);
+    
     const channel = supabase
       .channel(`realtime:${schema}.${table}`)
       .on('postgres_changes', { event: '*', schema, table }, (payload) => {
+        console.log(`[useRealtimeList] 🔔 Mudança detectada em ${table}:`, payload.eventType);
         setData((current) => {
           const next = [...current];
           const pk = primaryKey as string;
@@ -160,9 +179,12 @@ export function useRealtimeList<T = any>(options: UseRealtimeListOptions<T>) {
           return next;
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[useRealtimeList] Status do canal ${table}:`, status);
+      });
 
     return () => {
+      console.log(`[useRealtimeList] 🧹 Limpando hook para ${table}`);
       isMounted = false;
       supabase.removeChannel(channel);
     };
