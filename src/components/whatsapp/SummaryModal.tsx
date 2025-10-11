@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp, MessageSquare, Bot, User as UserIcon, AlertCircle, Download } from 'lucide-react';
+import { FileText, Loader2, AlertTriangle, CheckCircle2, Clock, TrendingUp, MessageSquare, Bot, User as UserIcon, AlertCircle, Download, Heart, Smile, Meh, Frown, Target, Lightbulb, Shield, Zap, Users, Activity, BarChart3, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-import { getApiBaseUrl } from '@/lib/apiConfig';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { analyzeConversationWithGemini, type AnalysisPeriod } from '@/lib/geminiAnalyzer';
+import { listMessagesBySession } from '@/lib/medxHistory';
 
 type SummaryPeriod = 'dia_atual' | 'ultimos_7_dias' | 'ultimos_15_dias' | 'ultimos_30_dias';
 
@@ -42,38 +43,46 @@ export function SummaryModal({ open, onOpenChange, sessionId, patientPhone }: Su
       setError('Nenhuma conversa selecionada.');
       return;
     }
-    if (!patientPhone || patientPhone.trim() === '') {
-      setError('Paciente sem telefone cadastrado.');
-      return;
-    }
 
     setLoading(true);
     setError(null);
+    setParsed(null);
+    
     try {
-      const baseUrl = await getApiBaseUrl();
-      const res = await fetch(`${baseUrl}/gerar-resumo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          numero_paciente: patientPhone,
-          periodo: period,
-        }),
-      });
-      if (!res.ok) throw new Error(`Erro ao gerar resumo: ${res.status}`);
-      const data = await res.json();
-      const first = Array.isArray(data) ? data[0] : data;
-      const output = first?.output ?? first;
-      let parsedObj: any = null;
-      if (typeof output === 'string') {
-        try { parsedObj = JSON.parse(output); } catch { parsedObj = { raw: output }; }
-      } else {
-        parsedObj = output;
+      // 1. Buscar todas as mensagens da sessão
+      console.log('📥 Buscando mensagens da sessão:', sessionId);
+      console.log('🔄 Período selecionado:', period);
+      
+      const messages = await listMessagesBySession(sessionId);
+      console.log('📨 Mensagens recebidas:', messages);
+      
+      if (messages.length === 0) {
+        throw new Error('Nenhuma mensagem encontrada nesta conversa.');
       }
-      setParsed(parsedObj);
-      toast.success('Resumo gerado com sucesso!');
+
+      console.log(`✅ ${messages.length} mensagens encontradas`);
+      console.log('📋 Primeira mensagem:', messages[0]);
+
+      // 2. Analisar conversa com Gemini
+      console.log('🤖 Iniciando análise com Gemini...');
+      console.log('⏳ Aguarde, isso pode levar alguns segundos...');
+      
+      const summary = await analyzeConversationWithGemini(
+        sessionId,
+        period as AnalysisPeriod,
+        messages
+      );
+
+      console.log('📊 Resumo recebido:', summary);
+
+      // 3. Definir resultado
+      setParsed(summary);
+      toast.success('✅ Resumo gerado com sucesso!');
+      
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao gerar resumo';
+      console.error('❌ Erro completo:', err);
+      console.error('❌ Stack trace:', err instanceof Error ? err.stack : 'N/A');
       setError(message);
       toast.error(message);
     } finally {
@@ -424,7 +433,7 @@ export function SummaryModal({ open, onOpenChange, sessionId, patientPhone }: Su
                   {qualidade && (
                     <div className="rounded-2xl border-2 bg-gradient-to-br from-background to-muted/30 p-6">
                       <h3 className="font-semibold text-lg mb-4">Métricas de Qualidade</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {Object.entries(qualidade).map(([key, value]) => (
                           <div key={key} className="text-center">
                             <div className="text-3xl font-bold text-primary mb-1">{String(value)}</div>
@@ -433,6 +442,325 @@ export function SummaryModal({ open, onOpenChange, sessionId, patientPhone }: Su
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Análise de Sentimento */}
+                  {parsed?.sentimento && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="rounded-2xl border-2 bg-gradient-to-br from-pink-500/5 to-rose-500/5 p-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Heart className="w-5 h-5 text-pink-500" />
+                          <h3 className="font-semibold">Sentimento Paciente</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {parsed.sentimento.paciente === 'Positivo' && <Smile className="w-6 h-6 text-green-500" />}
+                          {parsed.sentimento.paciente === 'Neutro' && <Meh className="w-6 h-6 text-yellow-500" />}
+                          {parsed.sentimento.paciente === 'Negativo' && <Frown className="w-6 h-6 text-red-500" />}
+                          <span className="text-lg font-semibold">{parsed.sentimento.paciente}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="rounded-2xl border-2 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 p-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Bot className="w-5 h-5 text-blue-500" />
+                          <h3 className="font-semibold">Sentimento IA</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {parsed.sentimento.ia === 'Positivo' && <Smile className="w-6 h-6 text-green-500" />}
+                          {parsed.sentimento.ia === 'Neutro' && <Meh className="w-6 h-6 text-yellow-500" />}
+                          {parsed.sentimento.ia === 'Negativo' && <Frown className="w-6 h-6 text-red-500" />}
+                          <span className="text-lg font-semibold">{parsed.sentimento.ia}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="rounded-2xl border-2 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 p-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Activity className="w-5 h-5 text-purple-500" />
+                          <h3 className="font-semibold">Satisfação</h3>
+                        </div>
+                        <div className="text-4xl font-bold text-purple-500">
+                          {parsed.sentimento.score_satisfacao}<span className="text-xl text-muted-foreground">/10</span>
+                        </div>
+                        <Progress value={(parsed.sentimento.score_satisfacao / 10) * 100} className="h-2 mt-2" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Evolução do Sentimento */}
+                  {parsed?.sentimento?.evolucao && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-indigo-500/5 to-violet-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingUp className="w-5 h-5 text-indigo-500" />
+                        <h3 className="font-semibold text-lg">Evolução da Conversa</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{parsed.sentimento.evolucao}</p>
+                    </div>
+                  )}
+
+                  {/* Tópicos Identificados */}
+                  {Array.isArray(parsed?.topicos_identificados) && parsed.topicos_identificados.length > 0 && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-cyan-500/5 to-teal-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Target className="w-5 h-5 text-cyan-500" />
+                        <h3 className="font-semibold text-lg">Tópicos Principais</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {parsed.topicos_identificados.map((topico: string, i: number) => (
+                          <Badge key={i} variant="outline" className="bg-cyan-500/10 border-cyan-500/30 text-cyan-700">
+                            {topico}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Momentos Críticos */}
+                  {Array.isArray(parsed?.momentos_criticos) && parsed.momentos_criticos.length > 0 && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-red-500/5 to-orange-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Zap className="w-5 h-5 text-orange-500" />
+                        <h3 className="font-semibold text-lg">Momentos Críticos</h3>
+                      </div>
+                      <div className="space-y-3">
+                        {parsed.momentos_criticos.map((momento: any, i: number) => (
+                          <div key={i} className={`p-3 rounded-lg border-2 ${
+                            momento.gravidade === 'Alta' ? 'bg-red-500/10 border-red-500/30' : 
+                            momento.gravidade === 'Média' ? 'bg-orange-500/10 border-orange-500/30' : 
+                            'bg-yellow-500/10 border-yellow-500/30'
+                          }`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-sm">{momento.tipo}</span>
+                              <Badge variant="outline" className={
+                                momento.gravidade === 'Alta' ? 'bg-red-500/20 border-red-500/50 text-red-700' : 
+                                momento.gravidade === 'Média' ? 'bg-orange-500/20 border-orange-500/50 text-orange-700' : 
+                                'bg-yellow-500/20 border-yellow-500/50 text-yellow-700'
+                              }>
+                                {momento.gravidade}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{momento.descricao}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Análise SWOT */}
+                  {parsed?.analise_detalhada && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Pontos Fortes */}
+                      {Array.isArray(parsed.analise_detalhada.pontos_fortes) && parsed.analise_detalhada.pontos_fortes.length > 0 && (
+                        <div className="rounded-2xl border-2 bg-gradient-to-br from-green-500/5 to-emerald-500/5 p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            <h3 className="font-semibold text-lg">Pontos Fortes</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {parsed.analise_detalhada.pontos_fortes.map((ponto: string, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span>{ponto}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Pontos a Melhorar */}
+                      {Array.isArray(parsed.analise_detalhada.pontos_melhorar) && parsed.analise_detalhada.pontos_melhorar.length > 0 && (
+                        <div className="rounded-2xl border-2 bg-gradient-to-br from-orange-500/5 to-amber-500/5 p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <TrendingUp className="w-5 h-5 text-orange-500" />
+                            <h3 className="font-semibold text-lg">Pontos a Melhorar</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {parsed.analise_detalhada.pontos_melhorar.map((ponto: string, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-sm">
+                                <TrendingUp className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                                <span>{ponto}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Oportunidades */}
+                      {Array.isArray(parsed.analise_detalhada.oportunidades) && parsed.analise_detalhada.oportunidades.length > 0 && (
+                        <div className="rounded-2xl border-2 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Lightbulb className="w-5 h-5 text-blue-500" />
+                            <h3 className="font-semibold text-lg">Oportunidades</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {parsed.analise_detalhada.oportunidades.map((oportunidade: string, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-sm">
+                                <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <span>{oportunidade}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Riscos */}
+                      {Array.isArray(parsed.analise_detalhada.riscos) && parsed.analise_detalhada.riscos.length > 0 && (
+                        <div className="rounded-2xl border-2 bg-gradient-to-br from-red-500/5 to-rose-500/5 p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <AlertTriangle className="w-5 h-5 text-red-500" />
+                            <h3 className="font-semibold text-lg">Riscos</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {parsed.analise_detalhada.riscos.map((risco: string, i: number) => (
+                              <li key={i} className="flex items-start gap-2 text-sm">
+                                <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                <span>{risco}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Comportamento do Paciente */}
+                  {parsed?.comportamento_paciente && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-violet-500/5 to-purple-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Users className="w-5 h-5 text-violet-500" />
+                        <h3 className="font-semibold text-lg">Comportamento do Paciente</h3>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <Badge variant="outline" className={`mb-2 ${
+                            parsed.comportamento_paciente.engajamento === 'Alto' ? 'bg-green-500/20 border-green-500/50 text-green-700' :
+                            parsed.comportamento_paciente.engajamento === 'Médio' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-700' :
+                            'bg-red-500/20 border-red-500/50 text-red-700'
+                          }`}>
+                            {parsed.comportamento_paciente.engajamento}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground">Engajamento</div>
+                        </div>
+                        <div className="text-center">
+                          <Badge variant="outline" className={`mb-2 ${
+                            parsed.comportamento_paciente.clareza_demanda === 'Clara' ? 'bg-green-500/20 border-green-500/50 text-green-700' :
+                            parsed.comportamento_paciente.clareza_demanda === 'Moderada' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-700' :
+                            'bg-red-500/20 border-red-500/50 text-red-700'
+                          }`}>
+                            {parsed.comportamento_paciente.clareza_demanda}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground">Clareza</div>
+                        </div>
+                        <div className="text-center">
+                          <Badge variant="outline" className={`mb-2 ${
+                            parsed.comportamento_paciente.urgencia_percebida === 'Alta' ? 'bg-red-500/20 border-red-500/50 text-red-700' :
+                            parsed.comportamento_paciente.urgencia_percebida === 'Média' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-700' :
+                            'bg-green-500/20 border-green-500/50 text-green-700'
+                          }`}>
+                            {parsed.comportamento_paciente.urgencia_percebida}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground">Urgência</div>
+                        </div>
+                        <div className="text-center">
+                          <Badge variant="outline" className={`mb-2 ${
+                            parsed.comportamento_paciente.satisfacao_aparente === 'Satisfeito' ? 'bg-green-500/20 border-green-500/50 text-green-700' :
+                            parsed.comportamento_paciente.satisfacao_aparente === 'Neutro' ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-700' :
+                            'bg-red-500/20 border-red-500/50 text-red-700'
+                          }`}>
+                            {parsed.comportamento_paciente.satisfacao_aparente}
+                          </Badge>
+                          <div className="text-xs text-muted-foreground">Satisfação</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Compliance */}
+                  {parsed?.compliance && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-indigo-500/5 to-blue-500/5 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-5 h-5 text-indigo-500" />
+                          <h3 className="font-semibold text-lg">Compliance de Atendimento</h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl font-bold text-indigo-500">{parsed.compliance.score_compliance}</span>
+                          <span className="text-sm text-muted-foreground">/10</span>
+                        </div>
+                      </div>
+                      <Progress value={(parsed.compliance.score_compliance / 10) * 100} className="h-2 mb-4" />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {Array.isArray(parsed.compliance.informacoes_coletadas) && parsed.compliance.informacoes_coletadas.length > 0 && (
+                          <div>
+                            <div className="text-sm font-semibold mb-2 text-green-600">✓ Informações Coletadas</div>
+                            <ul className="space-y-1">
+                              {parsed.compliance.informacoes_coletadas.map((info: string, i: number) => (
+                                <li key={i} className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                  {info}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {Array.isArray(parsed.compliance.informacoes_faltantes) && parsed.compliance.informacoes_faltantes.length > 0 && (
+                          <div>
+                            <div className="text-sm font-semibold mb-2 text-amber-600">⚠ Informações Faltantes</div>
+                            <ul className="space-y-1">
+                              {parsed.compliance.informacoes_faltantes.map((info: string, i: number) => (
+                                <li key={i} className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3 text-amber-500" />
+                                  {info}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timeline */}
+                  {Array.isArray(parsed?.timeline) && parsed.timeline.length > 0 && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-slate-500/5 to-gray-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Calendar className="w-5 h-5 text-slate-500" />
+                        <h3 className="font-semibold text-lg">Linha do Tempo</h3>
+                      </div>
+                      <div className="space-y-3">
+                        {parsed.timeline.map((evento: any, i: number) => (
+                          <div key={i} className="flex items-start gap-3">
+                            <div className={`mt-1 w-3 h-3 rounded-full flex-shrink-0 ${
+                              evento.tipo === 'success' ? 'bg-green-500' :
+                              evento.tipo === 'warning' ? 'bg-yellow-500' :
+                              evento.tipo === 'error' ? 'bg-red-500' :
+                              'bg-blue-500'
+                            }`}></div>
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold">{evento.momento}</div>
+                              <div className="text-xs text-muted-foreground">{evento.evento}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recomendações Específicas */}
+                  {Array.isArray(parsed?.recomendacoes_especificas) && parsed.recomendacoes_especificas.length > 0 && (
+                    <div className="rounded-2xl border-2 bg-gradient-to-br from-teal-500/5 to-emerald-500/5 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <BarChart3 className="w-5 h-5 text-teal-500" />
+                        <h3 className="font-semibold text-lg">Recomendações Específicas</h3>
+                      </div>
+                      <ul className="space-y-2">
+                        {parsed.recomendacoes_especificas.map((rec: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <Target className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
 

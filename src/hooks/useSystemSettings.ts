@@ -115,6 +115,8 @@ export const useSystemSettings = (key?: string): UseSystemSettingsReturn => {
  */
 export async function getSystemSetting(key: string): Promise<string | null> {
   try {
+    console.log(`🔍 [getSystemSetting] Buscando configuração: ${key}`);
+    
     const { data, error } = await supabase
       .from('system_settings')
       .select('value')
@@ -122,14 +124,17 @@ export async function getSystemSetting(key: string): Promise<string | null> {
       .eq('is_active', true)
       .single();
 
+    console.log(`📊 [getSystemSetting] Resultado para '${key}':`, { data, error });
+
     if (error || !data) {
-      console.error(`Configuração '${key}' não encontrada:`, error);
+      console.error(`❌ [getSystemSetting] Configuração '${key}' não encontrada:`, error);
       return null;
     }
 
+    console.log(`✅ [getSystemSetting] Valor encontrado para '${key}':`, data.value?.substring(0, 20) + '...');
     return data.value;
   } catch (err) {
-    console.error(`Erro ao buscar configuração '${key}':`, err);
+    console.error(`❌ [getSystemSetting] Erro ao buscar configuração '${key}':`, err);
     return null;
   }
 }
