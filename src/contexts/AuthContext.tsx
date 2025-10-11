@@ -230,7 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           event: '*', 
           schema: 'public', 
           table: 'profiles', 
-          filter: `auth_user_id=eq.${user.id}` 
+          filter: `auth_user_id=eq.${user.auth_id}` 
         }, 
         async () => {
           console.log('Perfil alterado, atualizando dados do usuário...');
