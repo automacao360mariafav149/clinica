@@ -15,6 +15,7 @@ import { User, Play, Pause, FileText, Bell, Stethoscope, Send } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { SummaryModal } from '@/components/whatsapp/SummaryModal';
+import { AssignDoctorModal } from '@/components/whatsapp/AssignDoctorModal';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -256,6 +257,13 @@ export default function WhatsApp() {
         queryClient.invalidateQueries({ queryKey: ['pre_patients_min'] });
         queryClient.invalidateQueries({ queryKey: ['medx_sessions'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patient_doctors' }, (payload) => {
+        // Atualizar médico atribuído quando houver alteração
+        const patientId = (payload.new as any)?.patient_id || (payload.old as any)?.patient_id;
+        if (patientId === selectedSessionId) {
+          queryClient.invalidateQueries({ queryKey: ['assigned_doctor', selectedSessionId] });
+        }
+      })
       .subscribe();
 
     return () => {
@@ -321,7 +329,40 @@ export default function WhatsApp() {
   }, [selectedSessionId]);
 
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [assignDoctorOpen, setAssignDoctorOpen] = useState(false);
   const [messageText, setMessageText] = useState('');
+
+  // Buscar médico atribuído ao paciente/pré-paciente da sessão selecionada
+  const { data: assignedDoctor, refetch: refetchAssignedDoctor } = useQuery({
+    queryKey: ['assigned_doctor', selectedSessionId],
+    queryFn: async () => {
+      if (!selectedSessionId) return null;
+      
+      // Buscar na tabela patient_doctors
+      const { data, error } = await supabase
+        .from('patient_doctors')
+        .select(`
+          doctor_id,
+          is_primary,
+          profiles!inner(id, name, specialization)
+        `)
+        .eq('patient_id', selectedSessionId)
+        .eq('is_primary', true)
+        .single();
+
+      if (error) {
+        console.log('Nenhum médico atribuído ainda');
+        return null;
+      }
+      
+      return data?.profiles ? {
+        id: (data.profiles as any).id,
+        name: (data.profiles as any).name,
+        specialization: (data.profiles as any).specialization,
+      } : null;
+    },
+    enabled: !!selectedSessionId,
+  });
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedSessionId) return;
@@ -438,8 +479,18 @@ export default function WhatsApp() {
                 <Avatar className="h-9 w-9">
                   <AvatarFallback>{selectedSession ? (selectedSession.kind === 'pre_patient' ? 'PP' : ((selectedSession.displayName ?? selectedSession.sessionId)?.slice(0, 2).toUpperCase())) : (selectedSessionId?.slice(0, 2).toUpperCase() ?? '')}</AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{selectedSession ? (selectedSession.kind === 'pre_patient' ? 'Pré Paciente' : (selectedSession.displayName ?? selectedSession.sessionId)) : (selectedSessionId ?? 'Selecione uma conversa')}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold truncate">
+                      {selectedSession ? (selectedSession.kind === 'pre_patient' ? 'Pré Paciente' : (selectedSession.displayName ?? selectedSession.sessionId)) : (selectedSessionId ?? 'Selecione uma conversa')}
+                    </div>
+                    {assignedDoctor && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground bg-accent/50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <Stethoscope className="h-3 w-3" />
+                        <span className="truncate max-w-[120px]">{assignedDoctor.name}</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{messages.length} mensagens</div>
                 </div>
                 <TooltipProvider delayDuration={80} skipDelayDuration={200}>
@@ -477,14 +528,16 @@ export default function WhatsApp() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {}}
+                        onClick={() => setAssignDoctorOpen(true)}
                         aria-label="Atribuir a médico"
                         className="transition-transform duration-200 hover:scale-110 hover:text-primary"
                       >
                         <Stethoscope className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">Atribuir a médico</TooltipContent>
+                    <TooltipContent side="bottom">
+                      {assignedDoctor ? 'Alterar médico' : 'Atribuir a médico'}
+                    </TooltipContent>
                     </Tooltip>
                   </div>
                 </TooltipProvider>
@@ -562,6 +615,24 @@ export default function WhatsApp() {
         </Card>
       </div>
       <SummaryModal open={summaryOpen} onOpenChange={setSummaryOpen} sessionId={selectedSessionId} patientPhone={patientPhone} />
+      {selectedSessionId && (
+        <AssignDoctorModal
+          open={assignDoctorOpen}
+          onOpenChange={setAssignDoctorOpen}
+          sessionId={selectedSessionId}
+          patientId={selectedSessionId}
+          isPrePatient={selectedSession?.kind === 'pre_patient'}
+          currentPatientName={selectedSession?.displayName}
+          onSuccess={() => {
+            // Invalidar queries para atualizar a interface
+            queryClient.invalidateQueries({ queryKey: ['assigned_doctor', selectedSessionId] });
+            queryClient.invalidateQueries({ queryKey: ['patients_min'] });
+            queryClient.invalidateQueries({ queryKey: ['pre_patients_min'] });
+            queryClient.invalidateQueries({ queryKey: ['medx_sessions'] });
+            refetchAssignedDoctor();
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
