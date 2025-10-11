@@ -99,4 +99,16 @@ All colors MUST be HSL.
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary) / 0.2) transparent;
   }
+
+  /* Garantir box-sizing em tudo */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Scrollbar gutter para evitar sobreposição */
+  .scrollbar-gutter-stable {
+    scrollbar-gutter: stable;
+  }
 }

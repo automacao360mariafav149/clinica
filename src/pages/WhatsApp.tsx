@@ -402,37 +402,38 @@ export default function WhatsApp() {
       <div className="h-full overflow-hidden p-4">
 
         <Card className="h-full overflow-hidden">
-          <div className="h-full min-h-0 grid grid-cols-[320px_1fr]">
+          <div className="h-full min-h-0 grid grid-cols-[340px_1fr]">
             {/* Sidebar de conversas */}
-            <div className="border-r flex flex-col min-h-0 p-4">
-              <div className="flex gap-2 mb-3">
-                <button
-                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'all' ? 'bg-accent' : 'hover:bg-accent/50'}`}
-                  onClick={() => setTab('all')}
-                >
-                  Todos
-                </button>
-                <button
-                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'pre' ? 'bg-accent' : 'hover:bg-accent/50'}`}
-                  onClick={() => setTab('pre')}
-                >
-                  Pré Pacientes
-                </button>
-                <button
-                  className={`text-xs px-3 py-1.5 rounded-full ${tab === 'crm' ? 'bg-accent' : 'hover:bg-accent/50'}`}
-                  onClick={() => setTab('crm')}
-                >
-                  Pacientes CRM
-                </button>
+            <div className="border-r flex flex-col min-h-0">
+              <div className="px-3 pt-4 pb-3">
+                <div className="flex gap-2 mb-3">
+                  <button
+                    className={`text-xs px-3 py-1.5 rounded-full ${tab === 'all' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                    onClick={() => setTab('all')}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    className={`text-xs px-3 py-1.5 rounded-full ${tab === 'pre' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                    onClick={() => setTab('pre')}
+                  >
+                    Pré Pacientes
+                  </button>
+                  <button
+                    className={`text-xs px-3 py-1.5 rounded-full ${tab === 'crm' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                    onClick={() => setTab('crm')}
+                  >
+                    Pacientes CRM
+                  </button>
+                </div>
+                <Input
+                  placeholder="Buscar por sessão ou mensagem…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <Input
-                placeholder="Buscar por sessão ou mensagem…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="mb-3"
-              />
               <ScrollArea className="flex-1 min-h-0">
-                <div className="space-y-1">
+                <div className="space-y-1 px-3 pb-4">
                   {loadingSessions && (
                     <div className="text-sm text-muted-foreground px-2 py-1">Carregando…</div>
                   )}
@@ -445,26 +446,27 @@ export default function WhatsApp() {
                       <button
                         key={s.sessionId}
                         onClick={() => setSelectedSessionId(s.sessionId)}
-                        className={`w-full text-left px-3 py-2 rounded-md transition-colors border-l-2 ${
+                        className={`block w-[98%] max-w-[325px] text-left px-2 py-2 rounded-xl transition-colors border-l-4 ${
                           s.kind === 'pre_patient' ? 'border-amber-400' : s.kind === 'patient' ? 'border-emerald-400' : 'border-muted'
                         } ${active ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                        style={{ boxSizing: 'border-box' }}
                       >
-                        <div className="flex items-center gap-3">
-                          <Avatar className={`h-8 w-8 ${s.kind === 'pre_patient' ? 'bg-amber-100' : 'bg-primary/10'}`}>
+                        <div className="flex items-center gap-2">
+                          <Avatar className={`h-8 w-8 shrink-0 ${s.kind === 'pre_patient' ? 'bg-amber-100' : 'bg-primary/10'}`}>
                             <AvatarFallback className={`${s.kind === 'pre_patient' ? 'text-amber-700' : 'text-primary'}`}>
                               {s.kind === 'pre_patient' ? (
-                                <User className="w-4 h-4" />
+                                <User className="w-3.5 h-3.5" />
                               ) : (
                                 (s.displayName?.[0] ?? s.sessionId?.[0] ?? '').toUpperCase()
                               )}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1 overflow-hidden">
                             <div className="text-sm font-medium truncate">{s.kind === 'pre_patient' ? 'Pré Paciente' : (s.displayName ?? s.sessionId)}</div>
                             <div className={`text-[10px] font-medium ${s.kind === 'pre_patient' ? 'text-amber-700' : s.kind === 'patient' ? 'text-emerald-700' : 'text-slate-500'}`}>{s.kind === 'pre_patient' ? 'Pré Paciente' : s.kind === 'patient' ? 'Paciente' : 'Desconhecido'}</div>
                             <div className="text-xs text-white truncate">{s.lastMessagePreview}</div>
                           </div>
-                          <div className="ml-auto text-xs text-muted-foreground">{s.totalMessages}</div>
+                          <div className="text-[11px] text-white shrink-0 ml-1">{s.totalMessages}</div>
                         </div>
                       </button>
                     );
