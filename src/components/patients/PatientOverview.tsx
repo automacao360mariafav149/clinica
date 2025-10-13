@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { PatientAvatarUpload } from './PatientAvatarUpload';
 import { PatientStatsCards } from './PatientStatsCards';
 import { PatientAlerts } from './PatientAlerts';
 import { ClinicalEvolutionChart } from './ClinicalEvolutionChart';
+import { PatientEditModal } from './PatientEditModal';
 import { Patient, MedicalRecord, ClinicalData, ExamHistory, Anamnesis } from '@/hooks/usePatientData';
 import { 
   Mail, 
@@ -12,7 +15,9 @@ import {
   MapPin, 
   Hash,
   User,
-  Clock
+  Clock,
+  Edit,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,6 +30,7 @@ interface PatientOverviewProps {
   examHistory: ExamHistory[];
   anamnesis: Anamnesis[];
   onAvatarUpdate?: (url: string) => void;
+  onPatientUpdate?: () => void;
 }
 
 export function PatientOverview({ 
@@ -34,12 +40,26 @@ export function PatientOverview({
   clinicalData,
   examHistory,
   anamnesis,
-  onAvatarUpdate 
+  onAvatarUpdate,
+  onPatientUpdate
 }: PatientOverviewProps) {
+  const [showEditModal, setShowEditModal] = useState(false);
+
   const formatDate = (date?: string) => {
     if (!date) return '-';
     try {
       return format(new Date(date), 'dd/MM/yyyy', { locale: ptBR });
+    } catch {
+      return '-';
+    }
+  };
+
+  const formatDateTime = (date?: string) => {
+    if (!date) return '-';
+    try {
+      return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", {
+        locale: ptBR,
+      });
     } catch {
       return '-';
     }
@@ -62,6 +82,10 @@ export function PatientOverview({
   };
 
   const age = calculateAge(patient.birth_date);
+
+  const handleEditSuccess = () => {
+    onPatientUpdate?.();
+  };
 
   return (
     <div className="space-y-6">
@@ -93,13 +117,24 @@ export function PatientOverview({
             </div>
 
             <div className="flex-1 space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">{patient.name}</h2>
-                {age && (
-                  <p className="text-muted-foreground">
-                    {age} anos {patient.gender && `• ${patient.gender}`}
-                  </p>
-                )}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">{patient.name}</h2>
+                  {age && (
+                    <p className="text-muted-foreground">
+                      {age} anos {patient.gender && `• ${patient.gender}`}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Editar
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -144,20 +179,34 @@ export function PatientOverview({
                 </div>
               )}
 
-              {/* Próxima Consulta */}
-              {patient.next_appointment_date && (
-                <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Próxima Consulta</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(patient.next_appointment_date), "dd/MM/yyyy 'às' HH:mm", {
-                        locale: ptBR,
-                      })}
-                    </p>
+              {/* Consultas - Última e Próxima */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Última Consulta */}
+                {patient.last_appointment_date && (
+                  <div className="flex items-center gap-2 p-3 bg-muted/50 border border-border rounded-lg">
+                    <History className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Última Consulta</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(patient.last_appointment_date)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Próxima Consulta */}
+                {patient.next_appointment_date && (
+                  <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">Próxima Consulta</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(patient.next_appointment_date)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -196,6 +245,14 @@ export function PatientOverview({
       {clinicalData.length > 0 && (
         <ClinicalEvolutionChart clinicalData={clinicalData} />
       )}
+
+      {/* Modal de Edição */}
+      <PatientEditModal
+        patient={patient}
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

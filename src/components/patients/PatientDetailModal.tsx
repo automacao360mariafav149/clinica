@@ -249,6 +249,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                       examHistory={examHistory}
                       anamnesis={anamnesis}
                       onAvatarUpdate={handleAvatarUpdate}
+                      onPatientUpdate={refetch}
                     />
                   </TabsContent>
 

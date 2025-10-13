@@ -14,7 +14,9 @@ export interface Patient {
   state?: string;
   zip_code?: string;
   avatar_url?: string;
+  health_insurance?: string;
   next_appointment_date?: string;
+  last_appointment_date?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
