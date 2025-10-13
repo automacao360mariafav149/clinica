@@ -284,7 +284,7 @@ export default function Convenios() {
 
   if (loading) {
     return (
-      <DashboardLayout requiredRoles={['owner', 'secretary', 'doctor']}>
+      <DashboardLayout requiredRoles={['secretary', 'doctor']}>
         <div className="flex items-center justify-center h-full">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -293,7 +293,7 @@ export default function Convenios() {
   }
 
   return (
-    <DashboardLayout requiredRoles={['owner', 'secretary', 'doctor']}>
+    <DashboardLayout requiredRoles={['secretary', 'doctor']}>
       <div className="p-8 space-y-6">
         {/* Header */}
         <div>
@@ -410,7 +410,7 @@ export default function Convenios() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
                   {company.plans.map((plan) => {
                     const isAccepted = company.acceptedPlanIds.includes(plan.id);
-                    const canModify = user?.role === 'doctor' || user?.role === 'owner';
+                    const canModify = user?.role === 'doctor';
                     return (
                       <Card
                         key={plan.id}

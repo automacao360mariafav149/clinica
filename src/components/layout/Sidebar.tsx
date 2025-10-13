@@ -58,7 +58,7 @@ export const Sidebar = () => {
       path: '/convenios', 
       icon: Building2, 
       label: 'Convênios', 
-      roles: ['owner', 'secretary', 'doctor'] 
+      roles: ['secretary', 'doctor'] 
     },
     { 
       path: '/doctors-insurance', 
