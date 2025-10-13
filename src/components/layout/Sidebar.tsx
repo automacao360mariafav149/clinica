@@ -9,7 +9,8 @@ import {
   Video, 
   Plug,
   Settings,
-  LogOut
+  LogOut,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,12 @@ export const Sidebar = () => {
         { path: '/patients', label: 'Pacientes CRM' },
         { path: '/pre-patients', label: 'Pré Pacientes' }
       ]
+    },
+    { 
+      path: '/convenios', 
+      icon: Building2, 
+      label: 'Convênios', 
+      roles: ['owner', 'secretary', 'doctor'] 
     },
     { 
       path: '/whatsapp', 

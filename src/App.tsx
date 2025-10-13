@@ -6,6 +6,7 @@ import FollowUp from "./pages/FollowUp";
 import Assistant from "./pages/Assistant";
 import Patients from "./pages/Patients";
 import PrePatients from "./pages/PrePatients";
+import Convenios from "./pages/Convenios";
 import WhatsApp from "./pages/WhatsApp";
 import Teleconsulta from "./pages/Teleconsulta";
 import Connections from "./pages/Connections";
@@ -31,6 +32,7 @@ const App = () => (
       <Route path="/assistant" element={<Assistant />} />
       <Route path="/patients" element={<Patients />} />
       <Route path="/pre-patients" element={<PrePatients />} />
+      <Route path="/convenios" element={<Convenios />} />
       <Route path="/whatsapp" element={<WhatsApp />} />
       <Route path="/teleconsulta" element={<Teleconsulta />} />
       <Route path="/connections" element={<Connections />} />
