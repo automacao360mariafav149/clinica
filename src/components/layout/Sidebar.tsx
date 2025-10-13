@@ -85,6 +85,12 @@ export const Sidebar = () => {
       roles: ['owner'] 
     },
     { 
+      path: '/clinic-info', 
+      icon: Settings, 
+      label: 'Informações da Clínica', 
+      roles: ['owner'] 
+    },
+    { 
       path: '/users', 
       icon: Settings, 
       label: 'Usuários', 

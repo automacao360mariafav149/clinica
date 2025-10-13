@@ -16,6 +16,7 @@ import Users from "./pages/Users";
 import DoctorSchedule from "./pages/DoctorSchedule";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
+import ClinicInfo from "./pages/ClinicInfo";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
@@ -39,6 +40,7 @@ const App = () => (
       <Route path="/teleconsulta" element={<Teleconsulta />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/integration" element={<Integration />} />
+      <Route path="/clinic-info" element={<ClinicInfo />} />
       <Route path="/users" element={<Users />} />
       <Route path="/users/:doctorId/schedule" element={<DoctorSchedule />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
