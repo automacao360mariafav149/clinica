@@ -42,14 +42,40 @@ export default function DoctorsInsurance() {
 
   useEffect(() => {
     loadDoctorsData();
+
+    // REALTIME: Escutar mudanças na tabela doctors_insurance_summary
+    const channel = supabase
+      .channel('doctors-insurance-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'doctors_insurance_summary',
+        },
+        (payload) => {
+          console.log('Realtime: Mudança detectada!', payload);
+          // Recarregar dados quando houver alteração
+          loadDoctorsData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup ao desmontar componente
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadDoctorsData = async () => {
     try {
       setLoading(true);
 
+      // Usa TABELA REAL ao invés de VIEW/função para suportar Realtime
       const { data, error } = await supabase
-        .rpc('get_doctors_insurance_summary');
+        .from('doctors_insurance_summary')
+        .select('*')
+        .order('doctor_name', { ascending: true });
 
       if (error) {
         console.error('Erro ao carregar dados:', error);
