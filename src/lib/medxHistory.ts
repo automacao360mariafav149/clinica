@@ -20,11 +20,65 @@ export type MedxSession = {
 export function extractMessageText(message: any): string {
   if (!message) return '';
   if (typeof message === 'string') return message;
-  if (typeof message?.content === 'string') return message.content;
+  if (typeof message?.content === 'string') {
+    const base = message.content as string;
+    const type = typeof message?.type === 'string' ? String(message.type).toLowerCase() : '';
+    if (type === 'human') {
+      const label = 'mensagem do paciente:';
+      const lower = base.toLowerCase();
+      const idx = lower.indexOf(label);
+      if (idx >= 0) {
+        const after = base.slice(idx + label.length);
+        const stopMarkers = [
+          '\n\n',
+          '\nInformações do Paciente:',
+          '\nInformacoes do Paciente:',
+          'Informações do Paciente:',
+          'Informacoes do Paciente:'
+        ];
+        let endIdx = -1;
+        for (const marker of stopMarkers) {
+          const pos = after.indexOf(marker);
+          if (pos >= 0) {
+            endIdx = endIdx === -1 ? pos : Math.min(endIdx, pos);
+          }
+        }
+        const extracted = after.slice(0, endIdx >= 0 ? endIdx : after.length).trim();
+        if (extracted) return extracted;
+      }
+    }
+    return base;
+  }
   if (Array.isArray(message?.content)) {
     const first = message.content.find((c: any) => typeof c?.text === 'string' || typeof c === 'string');
     if (!first) return '';
-    return typeof first === 'string' ? first : (first.text ?? '');
+    const type = typeof message?.type === 'string' ? String(message.type).toLowerCase() : '';
+    const text = typeof first === 'string' ? first : (first.text ?? '');
+    if (type === 'human') {
+      const label = 'mensagem do paciente:';
+      const lower = text.toLowerCase();
+      const idx = lower.indexOf(label);
+      if (idx >= 0) {
+        const after = text.slice(idx + label.length);
+        const stopMarkers = [
+          '\n\n',
+          '\nInformações do Paciente:',
+          '\nInformacoes do Paciente:',
+          'Informações do Paciente:',
+          'Informacoes do Paciente:'
+        ];
+        let endIdx = -1;
+        for (const marker of stopMarkers) {
+          const pos = after.indexOf(marker);
+          if (pos >= 0) {
+            endIdx = endIdx === -1 ? pos : Math.min(endIdx, pos);
+          }
+        }
+        const extracted = after.slice(0, endIdx >= 0 ? endIdx : after.length).trim();
+        if (extracted) return extracted;
+      }
+    }
+    return text;
   }
   return JSON.stringify(message);
 }
