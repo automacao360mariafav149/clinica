@@ -10,7 +10,8 @@ import {
   Plug,
   Settings,
   LogOut,
-  Building2
+  Building2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,12 @@ export const Sidebar = () => {
       icon: Building2, 
       label: 'Convênios', 
       roles: ['owner', 'secretary', 'doctor'] 
+    },
+    { 
+      path: '/doctors-insurance', 
+      icon: FileSpreadsheet, 
+      label: 'Visão de Convênios', 
+      roles: ['owner', 'secretary'] 
     },
     { 
       path: '/whatsapp', 
