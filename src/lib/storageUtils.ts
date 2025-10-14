@@ -150,6 +150,18 @@ export async function uploadPatientAvatar(
 }
 
 /**
+ * Verificar se o file_path é uma URL completa
+ */
+export function isFullUrl(filePath: string): boolean {
+  try {
+    const url = new URL(filePath);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Obter URL signed de um arquivo
  */
 export async function getSignedUrl(filePath: string, expiresIn: number = 3600): Promise<string | null> {
@@ -171,10 +183,36 @@ export async function getSignedUrl(filePath: string, expiresIn: number = 3600): 
 }
 
 /**
+ * Obter URL do arquivo - suporta tanto URLs completas quanto caminhos do storage
+ * Esta função detecta automaticamente se o file_path é uma URL ou caminho local
+ */
+export async function getFileUrl(filePath: string, expiresIn: number = 3600): Promise<string | null> {
+  try {
+    // Se já é uma URL completa, retornar diretamente
+    if (isFullUrl(filePath)) {
+      return filePath;
+    }
+
+    // Caso contrário, buscar URL signed do storage
+    return await getSignedUrl(filePath, expiresIn);
+  } catch (error) {
+    console.error('Erro ao obter URL do arquivo:', error);
+    return null;
+  }
+}
+
+/**
  * Deletar arquivo pelo path
+ * URLs externas não serão deletadas, apenas registros do storage local
  */
 export async function deleteFile(filePath: string): Promise<{ success: boolean; error?: string }> {
   try {
+    // Se for uma URL externa, não tentar deletar do storage
+    if (isFullUrl(filePath)) {
+      console.log('URL externa detectada, não será deletada do storage:', filePath);
+      return { success: true };
+    }
+
     const { error } = await supabase.storage.from(BUCKET_NAME).remove([filePath]);
 
     if (error) {
@@ -279,15 +317,60 @@ export function getFileExtension(fileName: string): string {
 
 /**
  * Verificar se arquivo é imagem
+ * Verifica tanto o fileName quanto o filePath (útil para URLs externas)
  */
-export function isImageFile(fileName: string): boolean {
+export function isImageFile(fileName: string, filePath?: string): boolean {
+  // Tentar pelo fileName primeiro
   const ext = getFileExtension(fileName);
-  return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+    return true;
+  }
+  
+  // Se não encontrou extensão no fileName e tem filePath, tentar pelo filePath
+  if (filePath) {
+    const extFromPath = getFileExtension(filePath);
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extFromPath);
+  }
+  
+  return false;
 }
 
 /**
  * Verificar se arquivo é PDF
+ * Verifica tanto o fileName quanto o filePath (útil para URLs externas)
  */
-export function isPdfFile(fileName: string): boolean {
-  return getFileExtension(fileName) === 'pdf';
+export function isPdfFile(fileName: string, filePath?: string): boolean {
+  // Tentar pelo fileName primeiro
+  if (getFileExtension(fileName) === 'pdf') {
+    return true;
+  }
+  
+  // Se não encontrou no fileName e tem filePath, tentar pelo filePath
+  if (filePath) {
+    return getFileExtension(filePath) === 'pdf';
+  }
+  
+  return false;
+}
+
+/**
+ * Verificar se arquivo é áudio
+ * Verifica tanto o fileName quanto o filePath (útil para URLs externas)
+ */
+export function isAudioFile(fileName: string, filePath?: string): boolean {
+  const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'opus'];
+  
+  // Tentar pelo fileName primeiro
+  const ext = getFileExtension(fileName);
+  if (audioExtensions.includes(ext)) {
+    return true;
+  }
+  
+  // Se não encontrou no fileName e tem filePath, tentar pelo filePath
+  if (filePath) {
+    const extFromPath = getFileExtension(filePath);
+    return audioExtensions.includes(extFromPath);
+  }
+  
+  return false;
 }

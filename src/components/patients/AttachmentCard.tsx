@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Download, Eye, FileText, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
-import { getSignedUrl, isImageFile, isPdfFile, formatFileSize } from '@/lib/storageUtils';
+import { getFileUrl, isImageFile, isPdfFile, formatFileSize } from '@/lib/storageUtils';
 import { toast } from 'sonner';
 
 interface Attachment {
@@ -32,8 +32,9 @@ export function AttachmentCard({ attachment, onDelete }: AttachmentCardProps) {
   const [showFullView, setShowFullView] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const isImage = isImageFile(attachment.file_name);
-  const isPdf = isPdfFile(attachment.file_name);
+  // Verificar extensão tanto no file_name quanto no file_path (URLs externas)
+  const isImage = isImageFile(attachment.file_name, attachment.file_path);
+  const isPdf = isPdfFile(attachment.file_name, attachment.file_path);
 
   // Carregar URL assinada ao montar
   useEffect(() => {
@@ -43,7 +44,8 @@ export function AttachmentCard({ attachment, onDelete }: AttachmentCardProps) {
   const loadSignedUrl = async () => {
     setLoadingUrl(true);
     try {
-      const url = await getSignedUrl(attachment.file_path, 3600); // 1 hora
+      // getFileUrl detecta automaticamente se é URL externa ou caminho do storage
+      const url = await getFileUrl(attachment.file_path, 3600); // 1 hora
       if (url) {
         setPreviewUrl(url);
       }

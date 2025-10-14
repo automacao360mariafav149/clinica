@@ -24,7 +24,7 @@ import { AttachmentCard } from './AttachmentCard';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
 import { MedicalRecord } from '@/hooks/usePatientData';
-import { deleteFile } from '@/lib/storageUtils';
+import { deleteFile, isAudioFile } from '@/lib/storageUtils';
 import {
   User,
   FileText,
@@ -60,6 +60,11 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
     error,
     refetch,
   } = usePatientData(patientId);
+
+  // Filtrar anexos - remover arquivos de áudio (.mp3, etc)
+  const visibleAttachments = attachments.filter((att) => {
+    return !isAudioFile(att.file_name, att.file_path);
+  });
 
   // Reset ao abrir/fechar modal
   useEffect(() => {
@@ -222,7 +227,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                   className="flex items-center gap-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
                 >
                   <Upload className="h-4 w-4" />
-                  Anexos ({attachments.length + agentExams.length})
+                  Anexos ({visibleAttachments.length + agentExams.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -452,11 +457,11 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                     )}
                     
                     {/* Arquivos Anexados Manualmente */}
-                    {attachments.length > 0 && (
+                    {visibleAttachments.length > 0 && (
                       <div>
-                        <h3 className="font-semibold mb-4">Arquivos Anexados ({attachments.length})</h3>
+                        <h3 className="font-semibold mb-4">Arquivos Anexados ({visibleAttachments.length})</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {attachments.map((att) => (
+                          {visibleAttachments.map((att) => (
                             <AttachmentCard
                               key={att.id}
                               attachment={att}
@@ -468,7 +473,7 @@ export function PatientDetailModal({ patientId, open, onOpenChange }: PatientDet
                     )}
                     
                     {/* Mensagem quando não há anexos */}
-                    {attachments.length === 0 && agentExams.length === 0 && (
+                    {visibleAttachments.length === 0 && agentExams.length === 0 && (
                       <div className="text-center py-12 text-muted-foreground">
                         <Upload className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p>Nenhum anexo ou exame analisado ainda</p>
