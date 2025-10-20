@@ -23,7 +23,7 @@ interface ClinicInfoRow {
   policy_rescheduling: string | null;
   policy_cancellation: string | null;
   doctor_ids?: string[] | null;
-  doctor_team?: { name?: string | null; specialization?: string | null }[] | null;
+  doctor_team?: { name?: string | null; specialization?: string | null; consultation_price?: number | null }[] | null;
 }
 
 interface DoctorProfile {
@@ -31,6 +31,7 @@ interface DoctorProfile {
   name: string | null;
   email: string | null;
   specialization: string | null;
+  consultation_price: number | null;
 }
 
 export default function ClinicInfo() {
@@ -40,6 +41,7 @@ export default function ClinicInfo() {
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState<boolean>(false);
   const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]);
+  const [doctorPrices, setDoctorPrices] = useState<Record<string, number>>({});
   const selectedDoctors = useMemo(() => (
     doctors.filter((d) => selectedDoctorIds.includes(d.id))
   ), [doctors, selectedDoctorIds]);
@@ -89,7 +91,7 @@ export default function ClinicInfo() {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, name, email, specialization, role')
+          .select('id, name, email, specialization, role, consultation_price')
           .eq('role', 'doctor')
           .order('name');
         if (error) throw error;
@@ -98,6 +100,7 @@ export default function ClinicInfo() {
           name: d.name,
           email: d.email,
           specialization: d.specialization,
+          consultation_price: d.consultation_price || 0,
         })));
       } catch (err: any) {
         console.error('Erro ao carregar médicos:', err);
@@ -123,6 +126,30 @@ export default function ClinicInfo() {
       .map((d) => d.id);
     if (ids.length > 0) setSelectedDoctorIds(ids);
   }, [clinicInfo, doctors, selectedDoctorIds.length]);
+
+  // Inicializa os preços dos médicos quando a lista for carregada
+  useEffect(() => {
+    if (doctors.length === 0) return;
+    const prices: Record<string, number> = {};
+    
+    // Primeiro, pega os preços da tabela profiles
+    doctors.forEach((d) => {
+      prices[d.id] = d.consultation_price || 0;
+    });
+
+    // Se houver doctor_team no clinic_info, sobrescreve com esses valores (prioridade)
+    const team = (clinicInfo as any)?.doctor_team as { name?: string | null; specialization?: string | null; consultation_price?: number | null }[] | undefined;
+    if (Array.isArray(team) && team.length > 0) {
+      team.forEach((t) => {
+        const doctor = doctors.find((d) => d.name === t.name && d.specialization === t.specialization);
+        if (doctor && t.consultation_price !== undefined && t.consultation_price !== null) {
+          prices[doctor.id] = t.consultation_price;
+        }
+      });
+    }
+
+    setDoctorPrices(prices);
+  }, [doctors, clinicInfo]);
 
   const handleChange = (field: keyof ClinicInfoRow, value: string) => {
     setClinicInfo((prev) => ({ ...(prev ?? emptyInfo), [field]: value }));
@@ -178,10 +205,92 @@ export default function ClinicInfo() {
     });
   };
 
+  const handlePriceChange = (doctorId: string, value: string) => {
+    // Remove tudo que não é número, vírgula ou ponto
+    let cleanValue = value.replace(/[^\d,\.]/g, '');
+    
+    // Se tem vírgula, garante apenas uma
+    if (cleanValue.includes(',')) {
+      const parts = cleanValue.split(',');
+      cleanValue = parts[0] + ',' + (parts[1] || '').slice(0, 2);
+    }
+    
+    // Se tem ponto, garante apenas um
+    if (cleanValue.includes('.')) {
+      const parts = cleanValue.split('.');
+      cleanValue = parts[0] + '.' + (parts[1] || '').slice(0, 2);
+    }
+    
+    // Converte para número (vírgula ou ponto para ponto)
+    const numValue = parseFloat(cleanValue.replace(',', '.')) || 0;
+    setDoctorPrices((prev) => ({ ...prev, [doctorId]: numValue }));
+  };
+
+  const formatPrice = (price: number): string => {
+    // Formata no padrão brasileiro (vírgula para decimais)
+    return price.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const handleSavePrices = async () => {
+    try {
+      // 1. Salva o preço de cada médico na tabela profiles
+      const updates = Object.entries(doctorPrices).map(([doctorId, price]) =>
+        supabase
+          .from('profiles')
+          .update({ consultation_price: price })
+          .eq('id', doctorId)
+      );
+
+      const results = await Promise.all(updates);
+      
+      // Verifica se houve algum erro
+      const errors = results.filter((r) => r.error);
+      if (errors.length > 0) {
+        console.error('Erros ao salvar preços:', errors);
+        toast.error('Erro ao salvar alguns preços de consulta');
+        return;
+      }
+
+      // 2. Atualiza o doctor_team na clinic_info com os preços atualizados
+      if (clinicInfo?.id && selectedDoctorIds.length > 0) {
+        const updatedTeam = doctors
+          .filter((d) => selectedDoctorIds.includes(d.id))
+          .map((d) => ({ 
+            name: d.name || null, 
+            specialization: d.specialization || null,
+            consultation_price: doctorPrices[d.id] || d.consultation_price || 0
+          }));
+
+        const { error: teamError } = await supabase
+          .from('clinic_info')
+          .update({ doctor_team: updatedTeam })
+          .eq('id', clinicInfo.id);
+
+        if (teamError) {
+          console.error('Erro ao atualizar doctor_team:', teamError);
+          toast.warning('Preços salvos, mas houve erro ao atualizar a equipe');
+          return;
+        }
+      }
+
+      toast.success('Preços de consulta salvos com sucesso');
+    } catch (err: any) {
+      console.error('Erro ao salvar preços:', err);
+      toast.error(err.message || 'Erro ao salvar preços de consulta');
+    }
+  };
+
   const handleSaveTeam = async () => {
     const team = doctors
       .filter((d) => selectedDoctorIds.includes(d.id))
-      .map((d) => ({ name: d.name || null, specialization: d.specialization || null }));
+      .map((d) => ({ 
+        name: d.name || null, 
+        specialization: d.specialization || null,
+        consultation_price: doctorPrices[d.id] || d.consultation_price || 0
+      }));
 
     // Obtém os IDs atuais antes da atualização
     const currentDoctorIds = (clinicInfo?.doctor_ids as string[]) || [];
@@ -451,9 +560,12 @@ export default function ClinicInfo() {
           <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Stethoscope className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Equipe Médica</span>
+              <span className="font-semibold">Equipe Médica e Preços</span>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleSavePrices} disabled={loadingDoctors}>
+                Salvar preços
+              </Button>
               <Button variant="outline" onClick={handleSaveTeam} disabled={loadingDoctors}>
                 Salvar equipe médica
               </Button>
@@ -485,7 +597,7 @@ export default function ClinicInfo() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {doctors.map((d) => (
                   <div key={d.id} className="border rounded-lg p-4 hover:shadow-sm transition-colors">
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 mb-3">
                       <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
                         <Stethoscope className="h-5 w-5 text-blue-600" />
                       </div>
@@ -503,6 +615,22 @@ export default function ClinicInfo() {
                           checked={selectedDoctorIds.includes(d.id)}
                           onCheckedChange={(checked) => toggleDoctor(d.id, Boolean(checked))}
                           aria-label={`Selecionar ${d.name || 'médico'}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`price-${d.id}`} className="text-xs">Preço da Consulta</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                          R$
+                        </span>
+                        <Input
+                          id={`price-${d.id}`}
+                          type="text"
+                          placeholder="0,00"
+                          value={formatPrice(doctorPrices[d.id] || 0)}
+                          onChange={(e) => handlePriceChange(d.id, e.target.value)}
+                          className="text-sm pl-10"
                         />
                       </div>
                     </div>
