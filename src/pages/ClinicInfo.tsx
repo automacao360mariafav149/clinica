@@ -183,6 +183,13 @@ export default function ClinicInfo() {
       .filter((d) => selectedDoctorIds.includes(d.id))
       .map((d) => ({ name: d.name || null, specialization: d.specialization || null }));
 
+    // Obtém os IDs atuais antes da atualização
+    const currentDoctorIds = (clinicInfo?.doctor_ids as string[]) || [];
+    
+    // Identifica médicos removidos (desabilitados) e médicos adicionados (habilitados)
+    const removedDoctorIds = currentDoctorIds.filter(id => !selectedDoctorIds.includes(id));
+    const addedDoctorIds = selectedDoctorIds.filter(id => !currentDoctorIds.includes(id));
+
     if (!clinicInfo || clinicInfo.id) {
       try {
         const payload = { doctor_ids: selectedDoctorIds, doctor_team: team } as any;
@@ -191,6 +198,65 @@ export default function ClinicInfo() {
           .update(payload)
           .eq('id', clinicInfo?.id);
         if (error) throw error;
+
+        // Atualiza os schedules dos médicos removidos (desabilita todos os dias)
+        if (removedDoctorIds.length > 0) {
+          const { error: disableError } = await supabase
+            .from('doctor_schedules')
+            .update({
+              seg_ativo: false,
+              ter_ativo: false,
+              qua_ativo: false,
+              qui_ativo: false,
+              sex_ativo: false,
+              sab_ativo: false,
+              dom_ativo: false,
+            })
+            .in('doctor_id', removedDoctorIds);
+          
+          if (disableError) {
+            console.error('Erro ao desabilitar schedules:', disableError);
+            toast.warning('Equipe atualizada, mas alguns horários podem não ter sido desabilitados');
+          }
+        }
+
+        // Atualiza os schedules dos médicos adicionados (habilita todos os dias)
+        if (addedDoctorIds.length > 0) {
+          // Verifica quais médicos já têm schedules cadastrados
+          const { data: existingSchedules, error: fetchError } = await supabase
+            .from('doctor_schedules')
+            .select('doctor_id')
+            .in('doctor_id', addedDoctorIds);
+
+          if (fetchError) {
+            console.error('Erro ao buscar schedules existentes:', fetchError);
+          } else {
+            const existingDoctorIds = (existingSchedules || []).map(s => s.doctor_id);
+            const doctorsWithSchedules = addedDoctorIds.filter(id => existingDoctorIds.includes(id));
+
+            // Habilita schedules dos médicos que já têm registro
+            if (doctorsWithSchedules.length > 0) {
+              const { error: enableError } = await supabase
+                .from('doctor_schedules')
+                .update({
+                  seg_ativo: true,
+                  ter_ativo: true,
+                  qua_ativo: true,
+                  qui_ativo: true,
+                  sex_ativo: true,
+                  sab_ativo: false,
+                  dom_ativo: false,
+                })
+                .in('doctor_id', doctorsWithSchedules);
+
+              if (enableError) {
+                console.error('Erro ao habilitar schedules:', enableError);
+                toast.warning('Equipe atualizada, mas alguns horários podem não ter sido habilitados');
+              }
+            }
+          }
+        }
+
         toast.success('Equipe médica atualizada');
       } catch (err: any) {
         console.error('Erro ao salvar equipe médica:', err);
@@ -208,6 +274,37 @@ export default function ClinicInfo() {
         .single();
       if (error) throw error;
       setClinicInfo(data as ClinicInfoRow);
+
+      // Para médicos selecionados na criação inicial, habilita seus schedules se existirem
+      if (selectedDoctorIds.length > 0) {
+        const { data: existingSchedules, error: fetchError } = await supabase
+          .from('doctor_schedules')
+          .select('doctor_id')
+          .in('doctor_id', selectedDoctorIds);
+
+        if (!fetchError && existingSchedules && existingSchedules.length > 0) {
+          const existingDoctorIds = existingSchedules.map(s => s.doctor_id);
+          
+          const { error: enableError } = await supabase
+            .from('doctor_schedules')
+            .update({
+              seg_ativo: true,
+              ter_ativo: true,
+              qua_ativo: true,
+              qui_ativo: true,
+              sex_ativo: true,
+              sab_ativo: false,
+              dom_ativo: false,
+            })
+            .in('doctor_id', existingDoctorIds);
+
+          if (enableError) {
+            console.error('Erro ao habilitar schedules:', enableError);
+            toast.warning('Equipe salva, mas alguns horários podem não ter sido habilitados');
+          }
+        }
+      }
+
       toast.success('Equipe médica salva');
     } catch (err: any) {
       console.error('Erro ao salvar equipe médica:', err);
