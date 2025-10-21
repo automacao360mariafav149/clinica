@@ -394,8 +394,8 @@ export default function WhatsApp() {
     queryFn: async () => {
       if (!selectedSessionId) return null;
       
-      // Buscar na tabela patient_doctors
-      const { data, error } = await supabase
+      // Primeiro, tenta buscar o médico principal (is_primary = true)
+      const { data: primaryData, error: primaryError } = await supabase
         .from('patient_doctors')
         .select(`
           doctor_id,
@@ -404,18 +404,39 @@ export default function WhatsApp() {
         `)
         .eq('patient_id', selectedSessionId)
         .eq('is_primary', true)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (!primaryError && primaryData?.profiles) {
+        return {
+          id: (primaryData.profiles as any).id,
+          name: (primaryData.profiles as any).name,
+          specialization: (primaryData.profiles as any).specialization,
+        };
+      }
+      
+      // Se não encontrou médico principal, busca qualquer médico vinculado
+      const { data: anyData, error: anyError } = await supabase
+        .from('patient_doctors')
+        .select(`
+          doctor_id,
+          is_primary,
+          profiles!inner(id, name, specialization)
+        `)
+        .eq('patient_id', selectedSessionId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (anyError || !anyData?.profiles) {
         console.log('Nenhum médico atribuído ainda');
         return null;
       }
       
-      return data?.profiles ? {
-        id: (data.profiles as any).id,
-        name: (data.profiles as any).name,
-        specialization: (data.profiles as any).specialization,
-      } : null;
+      return {
+        id: (anyData.profiles as any).id,
+        name: (anyData.profiles as any).name,
+        specialization: (anyData.profiles as any).specialization,
+      };
     },
     enabled: !!selectedSessionId,
   });
@@ -865,7 +886,7 @@ export default function WhatsApp() {
                       {selectedSession ? (selectedSession.kind === 'pre_patient' ? 'Pré Paciente' : (selectedSession.displayName ?? selectedSession.sessionId)) : (selectedSessionId ?? 'Selecione uma conversa')}
                     </div>
                     {assignedDoctor && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground bg-accent/50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <div className="flex items-center gap-1 text-xs text-white bg-accent/50 px-2 py-0.5 rounded-full whitespace-nowrap">
                         <Stethoscope className="h-3 w-3" />
                         <span className="truncate max-w-[120px]">{assignedDoctor.name}</span>
                       </div>
