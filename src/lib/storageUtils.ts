@@ -150,6 +150,79 @@ export async function uploadPatientAvatar(
 }
 
 /**
+ * Upload de avatar de médico/usuário (com substituição)
+ * Armazena na pasta doctors/<doctorId>/avatar
+ */
+export async function uploadDoctorAvatar(
+  file: File,
+  doctorId: string,
+  oldAvatarUrl?: string
+): Promise<{ path: string; url: string; error?: string }> {
+  try {
+    // Validar tipo de arquivo
+    if (!validateFileType(file, ALLOWED_IMAGE_TYPES)) {
+      return {
+        path: '',
+        url: '',
+        error: 'Por favor, selecione uma imagem válida (JPEG, PNG, WebP ou GIF)',
+      };
+    }
+
+    // Validar tamanho
+    if (!validateFileSize(file, MAX_AVATAR_SIZE)) {
+      return {
+        path: '',
+        url: '',
+        error: 'Imagem muito grande. Tamanho máximo: 5MB',
+      };
+    }
+
+    // Se existe avatar antigo, deletar primeiro
+    if (oldAvatarUrl) {
+      await deleteFileByUrl(oldAvatarUrl);
+    }
+
+    // Gerar nome único e caminho
+    const uniqueFileName = generateUniqueFileName(file.name);
+    const filePath = `doctors/${doctorId}/avatar/${uniqueFileName}`;
+
+    // Upload para o Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Erro no upload:', error);
+      return {
+        path: '',
+        url: '',
+        error: error.message,
+      };
+    }
+
+    // Obter URL pública (signed URL por 1 ano)
+    const { data: urlData } = await supabase.storage
+      .from(BUCKET_NAME)
+      .createSignedUrl(filePath, 31536000); // 1 ano em segundos
+
+    return {
+      path: filePath,
+      url: urlData?.signedUrl || '',
+    };
+  } catch (error: any) {
+    console.error('Erro no upload do avatar do médico:', error);
+    return {
+      path: '',
+      url: '',
+      error: error.message || 'Erro ao fazer upload do avatar',
+    };
+  }
+}
+
+/**
  * Verificar se o file_path é uma URL completa
  */
 export function isFullUrl(filePath: string): boolean {

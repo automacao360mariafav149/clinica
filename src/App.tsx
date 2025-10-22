@@ -14,6 +14,7 @@ import Connections from "./pages/Connections";
 import Integration from "./pages/Integration";
 import Users from "./pages/Users";
 import DoctorSchedule from "./pages/DoctorSchedule";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/Register";
 import ClinicInfo from "./pages/ClinicInfo";
@@ -43,6 +44,7 @@ const App = () => (
       <Route path="/clinic-info" element={<ClinicInfo />} />
       <Route path="/users" element={<Users />} />
       <Route path="/users/:doctorId/schedule" element={<DoctorSchedule />} />
+      <Route path="/profile" element={<Profile />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>

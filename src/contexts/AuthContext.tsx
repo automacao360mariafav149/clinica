@@ -10,6 +10,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  avatar_url?: string;
 }
 
 interface AuthContextType {
@@ -55,6 +56,7 @@ async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
     email: supaUser.email || '',
     name: profile.name || supaUser.email || 'Usuário',
     role: profile.role || 'doctor',
+    avatar_url: profile.avatar_url || undefined,
   };
 }
 

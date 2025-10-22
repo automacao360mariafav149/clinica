@@ -11,10 +11,12 @@ import {
   Settings,
   LogOut,
   Building2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export const Sidebar = () => {
   const { user, logout } = useAuth();
@@ -96,6 +98,12 @@ export const Sidebar = () => {
       label: 'Usuários', 
       roles: ['owner'] 
     },
+    { 
+      path: '/profile', 
+      icon: UserCircle, 
+      label: 'Meu Perfil', 
+      roles: ['owner', 'doctor', 'secretary'] 
+    },
   ];
 
   const visibleItems = menuItems.filter(item => 
@@ -165,17 +173,18 @@ export const Sidebar = () => {
 
       {/* User Info */}
       <div className="p-4 border-t border-sidebar-border flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-primary font-semibold text-sm">
-              {(user?.name?.charAt(0) || '').toUpperCase()}
-            </span>
-          </div>
+        <NavLink to="/profile" className="flex items-center gap-3 hover:bg-sidebar-accent/50 rounded-lg p-2 -m-2 transition-colors">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={user?.avatar_url} alt={user?.name} />
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+              {user?.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1">
             <p className="text-sm font-medium text-sidebar-foreground">{user?.name ?? ''}</p>
             <p className="text-xs text-muted-foreground capitalize">{user?.role ?? ''}</p>
           </div>
-        </div>
+        </NavLink>
       </div>
 
       {/* Logout */}

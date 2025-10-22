@@ -5,9 +5,11 @@ import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { DoctorAvatarUpload } from '@/components/doctors/DoctorAvatarUpload';
 import { 
   Dialog, 
   DialogContent, 
@@ -67,6 +69,7 @@ export default function Users() {
     phone: '',
     specialization: '',
     role: 'doctor' as 'doctor' | 'secretary' | 'owner',
+    avatar_url: '',
   });
   const [formData, setFormData] = useState({
     name: '',
@@ -490,6 +493,7 @@ export default function Users() {
       phone: user.phone || '',
       specialization: user.specialization || '',
       role: user.role,
+      avatar_url: user.avatar_url || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -508,6 +512,7 @@ export default function Users() {
           phone: editFormData.phone,
           specialization: editFormData.specialization,
           role: editFormData.role,
+          avatar_url: editFormData.avatar_url,
         })
         .eq('id', userToEdit.id);
 
@@ -729,14 +734,14 @@ export default function Users() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1 min-w-0">
                     {/* Avatar */}
-                    <div className={`
-                      flex h-12 w-12 items-center justify-center rounded-full shrink-0
-                      ${u.role === 'owner' ? 'bg-purple-500/10' : u.role === 'doctor' ? 'bg-blue-500/10' : 'bg-green-500/10'}
-                    `}>
-                      <User className={`h-6 w-6 
-                        ${u.role === 'owner' ? 'text-purple-500' : u.role === 'doctor' ? 'text-blue-500' : 'text-green-500'}
-                      `} />
-                    </div>
+                    <Avatar className="h-12 w-12 shrink-0">
+                      <AvatarImage src={u.avatar_url} alt={u.name} />
+                      <AvatarFallback className={`
+                        ${u.role === 'owner' ? 'bg-purple-500 text-white' : u.role === 'doctor' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'}
+                      `}>
+                        {u.name ? u.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
                     
                     {/* Nome e Role */}
                     <div className="flex-1 min-w-0">
@@ -1021,6 +1026,18 @@ export default function Users() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateUser} className="space-y-4">
+            {/* Avatar Upload */}
+            <div className="flex justify-center py-4">
+              <DoctorAvatarUpload
+                doctorId={userToEdit?.id || ''}
+                avatarUrl={editFormData.avatar_url}
+                doctorName={editFormData.name || 'Usuário'}
+                onUploadSuccess={(url) => setEditFormData({ ...editFormData, avatar_url: url })}
+                onRemoveSuccess={() => setEditFormData({ ...editFormData, avatar_url: '' })}
+                size="lg"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-name">Nome Completo</Label>
               <Input
