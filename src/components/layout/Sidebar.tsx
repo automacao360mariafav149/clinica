@@ -39,7 +39,7 @@ export const Sidebar = () => {
       path: '/follow-up', 
       icon: ClipboardList, 
       label: 'Follow Up', 
-      roles: ['owner', 'doctor', 'secretary'] 
+      roles: ['owner', 'secretary'] 
     },
     { 
       path: '/assistant', 
@@ -60,7 +60,7 @@ export const Sidebar = () => {
       path: '/convenios', 
       icon: Building2, 
       label: 'Convênios', 
-      roles: ['secretary', 'doctor'] 
+      roles: ['doctor'] 
     },
     { 
       path: '/doctors-insurance', 
