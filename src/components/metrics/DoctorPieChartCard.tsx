@@ -1,6 +1,7 @@
 import { Stethoscope, TrendingUp, Award, Users } from 'lucide-react';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { useRealtimeProfiles } from '@/hooks/useRealtimeProfiles';
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
@@ -16,7 +17,13 @@ interface Profile {
 
 export function DoctorPieChartCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
-  const { data: profiles } = useRealtimeList<Profile>({ table: 'profiles' });
+  
+  // Usa o novo hook com canal isolado e filtro para apenas médicos
+  const { profiles } = useRealtimeProfiles([], {
+    channelName: 'doctor-pie-chart-profiles',
+    filter: 'role.eq.doctor', // Só médicos
+    onlyUpdates: true, // Só precisa de updates para atualizar gráfico
+  });
 
   const doctorStats = useMemo(() => {
     const doctorCounts: Record<string, number> = {};

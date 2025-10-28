@@ -5,8 +5,8 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 export type UserRole = 'owner' | 'doctor' | 'secretary';
 
 export interface User {
-  id: string; // ID do perfil (profiles.id) - usar para doctor_id, patient_id, etc
-  auth_id: string; // ID do Supabase Auth (auth.uid()) - para referência
+  id: string;
+  auth_id: string;
   email: string;
   name: string;
   role: UserRole;
@@ -24,56 +24,167 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Mapeia um usuário do Supabase Auth para o formato da aplicação.
- * Usa query direta na tabela profiles para evitar timeouts com RPC.
- */
 async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
-  console.log('[AuthContext] Buscando perfil do usuário:', supaUser.id);
+  console.log('[AuthContext] 🔍 Buscando perfil do usuário:', supaUser.id);
+  console.log('[AuthContext] 📡 Iniciando query para profiles...');
   
-  // Query simples e direta na tabela profiles
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('auth_user_id', supaUser.id)
-    .single();
-  
-  if (error) {
-    console.error('[AuthContext] Erro ao buscar perfil:', error);
-    throw new Error(`Erro ao buscar perfil: ${error.message}`);
+  try {
+    // Cria uma Promise com timeout de 10 segundos para a query
+    const queryPromise = supabase
+      .from('profiles')
+      .select('*')
+      .eq('auth_user_id', supaUser.id)
+      .maybeSingle();
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Timeout na query de profiles após 10s'));
+      }, 10000);
+    });
+    
+    console.log('[AuthContext] ⏳ Aguardando resposta da query...');
+    const { data: profile, error } = await Promise.race([
+      queryPromise,
+      timeoutPromise
+    ]).catch((err) => {
+      console.error('[AuthContext] ❌ Query falhou ou deu timeout:', err);
+      return { data: null, error: err };
+    }) as any;
+    
+    console.log('[AuthContext] 📊 Resposta da query:', { 
+      hasProfile: !!profile, 
+      hasError: !!error,
+      errorMessage: error?.message,
+      errorCode: error?.code 
+    });
+    
+    if (error) {
+      console.error('[AuthContext] ❌ Erro na query:', error);
+      
+      // Verifica se é erro de timeout
+      if (error.message && error.message.includes('Timeout na query')) {
+        console.error('[AuthContext] ⚠️⚠️⚠️ QUERY DEU TIMEOUT! Possível problema de RLS ou conexão lenta.');
+        console.error('[AuthContext] 💡 DICA: Verifique as políticas RLS da tabela profiles no Supabase');
+        
+        // Retorna usuário básico para permitir login mesmo com erro
+        console.warn('[AuthContext] 🚨 Retornando usuário com dados básicos para permitir login');
+        return {
+          id: supaUser.id,
+          auth_id: supaUser.id,
+          email: supaUser.email || '',
+          name: supaUser.email || 'Usuário',
+          role: 'doctor' as UserRole,
+        };
+      }
+      
+      // Verifica se é erro de rate limit
+      if (error.message && error.message.includes('Rate limited')) {
+        console.warn('[AuthContext] ⚠️ Rate limit detectado, aguardando e tentando novamente...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { data: retryProfile, error: retryError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('auth_user_id', supaUser.id)
+          .maybeSingle();
+        
+        if (retryError) {
+          console.error('[AuthContext] ❌ Erro na segunda tentativa:', retryError);
+        } else if (retryProfile) {
+          console.log('[AuthContext] ✅ Perfil encontrado após retry:', retryProfile);
+          return {
+            id: retryProfile.id || supaUser.id,
+            auth_id: supaUser.id,
+            email: supaUser.email || '',
+            name: retryProfile.name || supaUser.email || 'Usuário',
+            role: retryProfile.role || 'doctor',
+            avatar_url: retryProfile.avatar_url || undefined,
+          };
+        }
+      } else if (error.code !== 'PGRST116') {
+        console.error('[AuthContext] ❌ Erro desconhecido:', error);
+      }
+    }
+
+    if (profile) {
+      console.log('[AuthContext] ✅ Perfil encontrado:', profile);
+    } else {
+      console.warn('[AuthContext] ⚠️ Perfil não encontrado, usando dados básicos');
+    }
+
+    // Sempre retorna um usuário, mesmo que seja com dados básicos
+    return {
+      id: profile?.id || supaUser.id,
+      auth_id: supaUser.id,
+      email: supaUser.email || '',
+      name: profile?.name || supaUser.email || 'Usuário',
+      role: profile?.role || 'doctor',
+      avatar_url: profile?.avatar_url || undefined,
+    };
+  } catch (error) {
+    console.error('[AuthContext] ❌ Erro inesperado:', error);
+    
+    // Se for erro de rate limit, mostra mensagem específica
+    if (error instanceof Error && error.message.includes('Rate limited')) {
+      console.error('[AuthContext] ❌ ERRO: Sistema sobrecarregado. Por favor, aguarde alguns segundos e tente novamente.');
+    }
+    
+    // Fallback completo em caso de erro
+    return {
+      id: supaUser.id,
+      auth_id: supaUser.id,
+      email: supaUser.email || '',
+      name: supaUser.email || 'Usuário',
+      role: 'doctor' as UserRole,
+    };
   }
-
-  if (!profile) {
-    console.error('[AuthContext] Nenhum perfil encontrado');
-    throw new Error('Seu perfil não foi encontrado no sistema. Entre em contato com o administrador.');
-  }
-
-  console.log('[AuthContext] Perfil encontrado:', profile);
-
-  return {
-    id: profile.id || supaUser.id,
-    auth_id: supaUser.id,
-    email: supaUser.email || '',
-    name: profile.name || supaUser.email || 'Usuário',
-    role: profile.role || 'doctor',
-    avatar_url: profile.avatar_url || undefined,
-  };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // useRef para persistir flag entre renders e evitar race conditions
   const isProcessingRef = useRef(false);
   const lastProcessedTimeRef = useRef(0);
+  const isMountedRef = useRef(true); // Nova flag para verificar se está montado
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null); // Ref para o timeout
   
-  // Debounce de 500ms para evitar múltiplas chamadas simultâneas
   const DEBOUNCE_MS = 500;
 
-  // Função para atualizar os dados do usuário a partir do Supabase
+  // Cleanup ao desmontar
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
+      }
+    };
+  }, []);
+  
+  // 🔥 MONITOR: Detecta quando user muda
+  useEffect(() => {
+    if (user) {
+      console.log('[AuthContext] ✅ User SETADO:', { 
+        id: user.id, 
+        name: user.name, 
+        role: user.role,
+        email: user.email 
+      });
+    } else {
+      console.warn('[AuthContext] ⚠️ User REMOVIDO (ficou null)');
+      console.warn('[AuthContext] Stack trace:', new Error().stack);
+    }
+  }, [user]);
+
   const refreshUser = async () => {
     console.log('[AuthContext] 🔄 refreshUser chamado');
+    
+    // Verifica se componente ainda está montado
+    if (!isMountedRef.current) {
+      console.log('[AuthContext] Componente desmontado, cancelando refresh');
+      return;
+    }
     
     // Debounce
     const now = Date.now();
@@ -90,61 +201,114 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isProcessingRef.current = true;
     lastProcessedTimeRef.current = now;
     
+    // 🔥 TIMEOUT DE SEGURANÇA - CRÍTICO!
+    if (timeoutIdRef.current) {
+      clearTimeout(timeoutIdRef.current);
+    }
+    
+    timeoutIdRef.current = setTimeout(() => {
+      console.error('[AuthContext] ⚠️ Timeout de segurança ativado - liberando flag após 30s');
+      isProcessingRef.current = false;
+      timeoutIdRef.current = null;
+    }, 30000); // 30 segundos de timeout (para conexões lentas)
+    
     try {
       console.log('[AuthContext] Buscando sessão atual...');
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
       
+      if (!isMountedRef.current) {
+        console.log('[AuthContext] Componente desmontado durante operação');
+        return;
+      }
+      
       if (currentUser) {
         console.log('[AuthContext] Sessão encontrada, mapeando perfil...');
         const mapped = await mapSupabaseUserToAppUser(currentUser);
+        
+        if (!isMountedRef.current) {
+          console.log('[AuthContext] Componente desmontado antes de setar user');
+          return;
+        }
+        
         console.log('[AuthContext] ✅ Perfil mapeado:', mapped);
-        console.log('[AuthContext] Atualizando estado do user...');
         setUser(mapped);
-        console.log('[AuthContext] ✅ Estado atualizado com sucesso!');
       } else {
         console.log('[AuthContext] ⚠️ Nenhuma sessão ativa');
-        setUser(null);
+        if (isMountedRef.current) {
+          setUser(null);
+        }
       }
     } catch (error) {
       console.error('[AuthContext] ❌ Erro ao atualizar dados do usuário:', error);
-      // NÃO fazer logout automático em caso de erro - pode ser apenas timeout temporário
-      // Apenas logar o erro e manter o estado atual
+      // Não faz nada, mantém o estado atual
     } finally {
+      // Limpa o timeout e reseta a flag
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = null;
+      }
       isProcessingRef.current = false;
-      console.log('[AuthContext] refreshUser finalizado');
+      console.log('[AuthContext] refreshUser finalizado - flag liberada');
     }
   };
 
+  // Carregamento inicial da sessão
   useEffect(() => {
     const init = async () => {
-      if (isProcessingRef.current) return;
-      isProcessingRef.current = true;
-  
+      if (!isMountedRef.current) return;
+      
       try {
         const { data } = await supabase.auth.getSession();
         const currentUser = data.session?.user;
-        if (currentUser) {
+        
+        if (currentUser && isMountedRef.current) {
           const mapped = await mapSupabaseUserToAppUser(currentUser);
-          setUser(mapped);
+          if (isMountedRef.current) {
+            setUser(mapped);
+          }
         }
       } catch (error) {
         console.error('[AuthContext] Erro ao carregar sessão inicial:', error);
       } finally {
-        setIsLoading(false);
-        isProcessingRef.current = false;
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
-  
+
     init();
-  
-    // onAuthStateChange simplificado: apenas SIGNED_IN e SIGNED_OUT
+
+    // Listener de mudanças de autenticação
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Auth event:', event);
+      console.log('[AuthContext] 📡 Auth event recebido:', event);
+      console.log('[AuthContext] 📡 Session:', session ? 'existe' : 'null');
+      console.log('[AuthContext] 📡 Stack trace:', new Error().stack);
       
-      // Ignorar eventos que não sejam SIGNED_IN ou SIGNED_OUT
+      if (!isMountedRef.current) {
+        console.log('[AuthContext] ⚠️ Evento ignorado - componente desmontado');
+        return;
+      }
+      
+      // Processa TOKEN_REFRESHED sem recarregar o perfil
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('[AuthContext] ✅ Token renovado - sessão mantida');
+        return;
+      }
+      
+      // 🔥 LOG ESPECIAL PARA SIGNED_OUT
+      if (event === 'SIGNED_OUT') {
+        console.error('[AuthContext] 🚨🚨🚨 SIGNED_OUT DETECTADO!');
+        console.error('[AuthContext] Isso pode indicar:');
+        console.error('[AuthContext] 1. Token expirado');
+        console.error('[AuthContext] 2. Logout chamado de outro lugar');
+        console.error('[AuthContext] 3. Sessão invalidada pelo Supabase');
+        console.error('[AuthContext] Stack trace:', new Error().stack);
+      }
+      
+      // Processa apenas SIGNED_IN e SIGNED_OUT
       if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
-        console.log('[AuthContext] Evento ignorado:', event);
+        console.log('[AuthContext] ⚠️ Evento ignorado:', event);
         return;
       }
       
@@ -162,28 +326,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       isProcessingRef.current = true;
       lastProcessedTimeRef.current = now;
-  
+      
+      // Timeout de segurança para eventos (30 segundos para conexões lentas)
+      const eventTimeoutId = setTimeout(() => {
+        console.error('[AuthContext] ⚠️ Timeout no processamento de evento após 30s');
+        isProcessingRef.current = false;
+      }, 30000);
+
       try {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('[AuthContext] SIGNED_IN: Carregando perfil...');
           const mapped = await mapSupabaseUserToAppUser(session.user);
-          setUser(mapped);
+          if (isMountedRef.current) {
+            setUser(mapped);
+          }
         } else if (event === 'SIGNED_OUT') {
           console.log('[AuthContext] SIGNED_OUT: Limpando usuário');
-          setUser(null);
+          if (isMountedRef.current) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error('[AuthContext] Erro ao processar mudança de autenticação:', error);
-        // NÃO limpar usuário em caso de erro - pode ser timeout temporário
       } finally {
+        clearTimeout(eventTimeoutId);
         isProcessingRef.current = false;
       }
     });
-  
+
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  // 🔥 TEMPORARIAMENTE DESABILITADO - Para debug de logout automático
+  // Listener realtime DESABILITADO durante testes
+  useEffect(() => {
+    if (!user?.auth_id) {
+      console.log('[Realtime] ⚠️ DEBUG MODE: Listener realtime DESABILITADO');
+      return;
+    }
+    
+    console.log('[Realtime] ⚠️ DEBUG MODE: Listener realtime DESABILITADO para evitar logouts automáticos');
+    console.log('[Realtime] User atual:', { 
+      id: user.id,
+      auth_id: user.auth_id, 
+      name: user.name, 
+      role: user.role, 
+      avatar_url: user.avatar_url 
+    });
+    
+    // DESABILITADO: não cria canal realtime
+    // const channel = supabase.channel(...)
+    
+    return () => {
+      console.log('[Realtime] Cleanup (listener estava desabilitado)');
+    };
+  }, [user?.auth_id]); // Dependência mínima
 
   const login = async (email: string, password: string) => {
     if (!isSupabaseConfigured) {
@@ -193,12 +392,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log('[AuthContext] Iniciando login para:', email);
     
     try {
-      // Autenticação sem timeout - deixar o Supabase gerenciar
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
         console.error('[AuthContext] Erro na autenticação:', error);
-        // Mensagens de erro mais amigáveis
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Email ou senha incorretos');
         } else if (error.message.includes('Email not confirmed')) {
@@ -215,79 +412,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       console.log('[AuthContext] Autenticação bem-sucedida, buscando perfil...');
       
-      // Busca os dados do perfil ANTES de definir o usuário
-      // Isso garante que sempre teremos a role correta
       const mapped = await mapSupabaseUserToAppUser(currentUser);
-      setUser(mapped);
+      if (isMountedRef.current) {
+        setUser(mapped);
+      }
       
       console.log('[AuthContext] Login concluído com sucesso');
     } catch (error) {
       console.error('[AuthContext] Erro no login:', error);
-      // Se falhar em qualquer etapa, fazer logout para garantir estado limpo
       await supabase.auth.signOut();
       throw error;
     }
   };
 
-  // Assina mudanças do perfil do usuário atual para refletir role/name em tempo real
-  useEffect(() => {
-    if (!user?.auth_id) {
-      console.log('[Realtime] Sem user.auth_id, não criando canal');
-      return;
-    }
-    
-    console.log('[Realtime] Criando canal para auth_id:', user.auth_id);
-    console.log('[Realtime] Dados do user:', { id: user.id, auth_id: user.auth_id, name: user.name, role: user.role });
-    
-    const channel = supabase
-      .channel('realtime:profiles:self')
-      .on(
-        'postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'profiles', 
-          filter: `auth_user_id=eq.${user.auth_id}` 
-        }, 
-        (payload) => {
-          console.log('[Realtime] ✅ Mudança detectada no perfil!');
-          console.log('[Realtime] Payload:', payload);
-          console.log('[Realtime] Chamando refreshUser...');
-          refreshUser();
-        }
-      )
-      .subscribe((status) => {
-        console.log('[Realtime] Status da subscription:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[Realtime] ✅ Canal ativo e escutando mudanças');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[Realtime] ❌ Erro no canal');
-        } else if (status === 'TIMED_OUT') {
-          console.error('[Realtime] ❌ Timeout na conexão');
-        }
-      });
-
-    return () => {
-      console.log('[Realtime] Removendo canal');
-      supabase.removeChannel(channel);
-    };
-  }, [user?.auth_id]); // Dependência correta: user.auth_id
-
   const logout = async () => {
+    // 🔥 LOG DETALHADO: Identifica quem chamou o logout
+    console.log('[AuthContext] 🚨 LOGOUT CHAMADO!');
+    console.log('[AuthContext] Stack trace:', new Error().stack);
+    console.log('[AuthContext] User atual:', user);
+    
     try {
       console.log('[AuthContext] Iniciando logout...');
       
-      // Limpa o usuário imediatamente para melhor UX
-      setUser(null);
+      if (isMountedRef.current) {
+        console.log('[AuthContext] Limpando user (setUser(null))');
+        setUser(null);
+      } else {
+        console.warn('[AuthContext] ⚠️ Componente desmontado durante logout');
+      }
       
-      // Faz o signOut do Supabase (ele já gerencia a limpeza do storage)
+      console.log('[AuthContext] Chamando supabase.auth.signOut()');
       await supabase.auth.signOut();
       
-      console.log('[AuthContext] Logout realizado com sucesso');
+      console.log('[AuthContext] ✅ Logout realizado com sucesso');
     } catch (error) {
-      console.error('[AuthContext] Erro ao fazer logout:', error);
-      // Garante que o usuário seja limpo mesmo em caso de erro
-      setUser(null);
+      console.error('[AuthContext] ❌ Erro ao fazer logout:', error);
+      if (isMountedRef.current) {
+        setUser(null);
+      }
     }
   };
 

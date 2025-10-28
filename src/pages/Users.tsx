@@ -6,7 +6,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { useRealtimeProfiles } from '@/hooks/useRealtimeProfiles';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { DoctorAvatarUpload } from '@/components/doctors/DoctorAvatarUpload';
@@ -40,10 +40,14 @@ import { getApiBaseUrl } from '@/lib/apiConfig';
 export default function Users() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const { data, loading, error } = useRealtimeList<any>({
-    table: 'profiles',
-    order: { column: 'created_at', ascending: false },
+  
+  // Usa o novo hook com canal isolado
+  const { profiles: data, isLoading: loading, refetch } = useRealtimeProfiles([], {
+    channelName: 'users-page-profiles', // Canal único para esta página
+    onlyUpdates: false, // Precisa de INSERT/DELETE para gerenciar usuários
   });
+  
+  const error = null; // Hook não retorna error, mas podemos adicionar se necessário
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);

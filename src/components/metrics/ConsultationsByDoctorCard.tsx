@@ -1,6 +1,7 @@
 import { Stethoscope, Activity } from 'lucide-react';
 import { MagicBentoCard } from '@/components/bento/MagicBento';
 import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { useRealtimeProfiles } from '@/hooks/useRealtimeProfiles';
 import { useMemo } from 'react';
 
 interface Appointment {
@@ -15,7 +16,13 @@ interface Profile {
 
 export function ConsultationsByDoctorCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
-  const { data: profiles } = useRealtimeList<Profile>({ table: 'profiles' });
+  
+  // Usa o novo hook com canal isolado e filtro para apenas médicos
+  const { profiles } = useRealtimeProfiles([], {
+    channelName: 'consultations-doctor-profiles',
+    filter: 'role.eq.doctor', // Só médicos
+    onlyUpdates: true, // Só updates
+  });
 
   const doctorStats = useMemo(() => {
     const doctorCounts: Record<string, number> = {};
