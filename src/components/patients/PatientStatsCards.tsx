@@ -38,20 +38,23 @@ export function PatientStatsCards({
   // Calcular pendências (exemplo: dados clínicos desatualizados, exames sem resultado)
   const pendingItems = (() => {
     let count = 0;
+    const items: string[] = [];
     
     // Dados clínicos desatualizados (> 6 meses)
     const lastClinicalData = clinicalData[0];
     if (!lastClinicalData || 
         new Date().getTime() - new Date(lastClinicalData.measurement_date).getTime() > 180 * 24 * 60 * 60 * 1000) {
       count++;
+      items.push('Dados Clínicos');
     }
 
     // Anamnese vazia ou desatualizada
     if (anamnesis.length === 0) {
       count++;
+      items.push('Anamnese');
     }
 
-    return count;
+    return { count, items };
   })();
 
   const stats = [
@@ -81,10 +84,11 @@ export function PatientStatsCards({
     },
     {
       label: 'Pendências',
-      value: pendingItems,
+      value: pendingItems.count,
       icon: AlertCircle,
-      color: pendingItems > 0 ? 'text-orange-600' : 'text-gray-600',
-      bgColor: pendingItems > 0 ? 'bg-orange-50' : 'bg-gray-50',
+      color: pendingItems.count > 0 ? 'text-orange-600' : 'text-gray-600',
+      bgColor: pendingItems.count > 0 ? 'bg-orange-50' : 'bg-gray-50',
+      details: pendingItems.items,
     },
   ];
 
@@ -107,6 +111,16 @@ export function PatientStatsCards({
                     <p className="text-xs text-muted-foreground mt-1">
                       {stat.subtitle}
                     </p>
+                  )}
+                  {stat.details && stat.details.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {stat.details.map((detail, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <div className="w-1 h-1 rounded-full bg-orange-500" />
+                          <span>{detail}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className={`${stat.bgColor} ${stat.color} p-3 rounded-lg`}>
