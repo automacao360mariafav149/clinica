@@ -53,7 +53,7 @@ export function DoctorPieChartCard() {
     return doctors
       .map((doctor) => ({
         id: doctor.id,
-        name: doctor.full_name || 'Médico',
+        name: doctor.name || 'Médico',
         value: doctorCounts[doctor.id] || 0,
         percentage: ((doctorCounts[doctor.id] || 0) / total * 100).toFixed(1),
       }))
