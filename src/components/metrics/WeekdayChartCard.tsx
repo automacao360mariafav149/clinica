@@ -8,19 +8,34 @@ interface Appointment {
   scheduled_at: string;
 }
 
+interface MedicalRecord {
+  appointment_date: string;
+}
+
 const weekDayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function WeekdayChartCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
+  const { data: medicalRecords } = useRealtimeList<MedicalRecord>({ table: 'medical_records' });
 
   const weekdayStats = useMemo(() => {
     const dayCounts: Record<number, number> = {
       0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0,
     };
 
+    // Buscar de appointments
     appointments.forEach((apt) => {
       if (apt.scheduled_at) {
         const date = new Date(apt.scheduled_at);
+        const dayOfWeek = date.getDay();
+        dayCounts[dayOfWeek]++;
+      }
+    });
+
+    // TAMBÉM buscar de medical_records
+    medicalRecords.forEach((record) => {
+      if (record.appointment_date) {
+        const date = new Date(record.appointment_date);
         const dayOfWeek = date.getDay();
         dayCounts[dayOfWeek]++;
       }
@@ -31,7 +46,7 @@ export function WeekdayChartCard() {
       name: weekDayNames[parseInt(day)],
       count,
     }));
-  }, [appointments]);
+  }, [appointments, medicalRecords]);
 
   const COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#F97316'];
 

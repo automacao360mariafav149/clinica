@@ -8,15 +8,30 @@ interface Appointment {
   scheduled_at: string;
 }
 
+interface MedicalRecord {
+  appointment_date: string;
+}
+
 export function PeakHoursChartCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
+  const { data: medicalRecords } = useRealtimeList<MedicalRecord>({ table: 'medical_records' });
 
   const hourStats = useMemo(() => {
     const hourCounts: Record<number, number> = {};
 
+    // Buscar de appointments
     appointments.forEach((apt) => {
       if (apt.scheduled_at) {
         const date = new Date(apt.scheduled_at);
+        const hour = date.getHours();
+        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+      }
+    });
+
+    // TAMBÉM buscar de medical_records
+    medicalRecords.forEach((record) => {
+      if (record.appointment_date) {
+        const date = new Date(record.appointment_date);
         const hour = date.getHours();
         hourCounts[hour] = (hourCounts[hour] || 0) + 1;
       }
@@ -32,7 +47,7 @@ export function PeakHoursChartCard() {
       .sort((a, b) => a.hour - b.hour);
 
     return sorted;
-  }, [appointments]);
+  }, [appointments, medicalRecords]);
 
   const COLORS = ['#5227FF', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'];
 

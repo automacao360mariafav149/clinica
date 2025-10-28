@@ -9,6 +9,10 @@ interface Appointment {
   doctor_id: string;
 }
 
+interface MedicalRecord {
+  doctor_id: string;
+}
+
 interface Profile {
   id: string;
   full_name: string;
@@ -17,6 +21,7 @@ interface Profile {
 
 export function DoctorPieChartCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
+  const { data: medicalRecords } = useRealtimeList<MedicalRecord>({ table: 'medical_records' });
   
   // Usa o novo hook com canal isolado e filtro para apenas médicos
   const { profiles } = useRealtimeProfiles([], {
@@ -28,14 +33,22 @@ export function DoctorPieChartCard() {
   const doctorStats = useMemo(() => {
     const doctorCounts: Record<string, number> = {};
 
+    // Buscar de appointments
     appointments.forEach((apt) => {
       if (apt.doctor_id) {
         doctorCounts[apt.doctor_id] = (doctorCounts[apt.doctor_id] || 0) + 1;
       }
     });
 
+    // TAMBÉM buscar de medical_records
+    medicalRecords.forEach((record) => {
+      if (record.doctor_id) {
+        doctorCounts[record.doctor_id] = (doctorCounts[record.doctor_id] || 0) + 1;
+      }
+    });
+
     const doctors = profiles.filter((p) => p.role === 'doctor');
-    const total = appointments.length || 1;
+    const total = (appointments.length + medicalRecords.length) || 1;
 
     return doctors
       .map((doctor) => ({
@@ -46,7 +59,7 @@ export function DoctorPieChartCard() {
       }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [appointments, profiles]);
+  }, [appointments, medicalRecords, profiles]);
 
   const COLORS = ['#5227FF', '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'];
   const MEDAL_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];

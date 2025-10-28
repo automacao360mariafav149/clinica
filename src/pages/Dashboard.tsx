@@ -1,8 +1,8 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MagicBentoGrid, MagicBentoCard } from '@/components/bento/MagicBento';
-import { Users, Calendar, TrendingUp, Clock, Activity, Stethoscope } from 'lucide-react';
-import { useRealtimeList } from '@/hooks/useRealtimeList';
+import { Users, Calendar, Activity, Stethoscope } from 'lucide-react';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { PeakHoursChartCard } from '@/components/metrics/PeakHoursChartCard';
 import { WeekdayChartCard } from '@/components/metrics/WeekdayChartCard';
 import { DoctorPieChartCard } from '@/components/metrics/DoctorPieChartCard';
@@ -10,26 +10,37 @@ import { InsuranceDonutCard } from '@/components/metrics/InsuranceDonutCard';
 import { DiseaseTreemapCard } from '@/components/metrics/DiseaseTreemapCard';
 
 export default function Dashboard() {
-  const today = new Date();
-  const todayISO = today.toISOString().slice(0, 10); // YYYY-MM-DD
-
-  // Listas mínimas só para obter contagens reativas
-  const { data: appointments } = useRealtimeList<any>({ table: 'appointments' });
-  const { data: patients } = useRealtimeList<any>({ table: 'patients' });
-  const { data: prePatients } = useRealtimeList<any>({ table: 'pre_patients' });
+  const metrics = useDashboardMetrics();
 
   const stats = [
     {
       title: 'Consultas Hoje',
-      value: String(
-        appointments.filter((a) => (a.scheduled_at ?? '').slice(0, 10) === todayISO).length,
-      ),
+      value: String(metrics.consultasHoje),
       icon: Calendar,
-      trend: '+0%'
+      trend: metrics.calculateTrend(metrics.consultasMesAtual, metrics.consultasMesAnterior),
+      description: 'vs. mês passado'
     },
-    { title: 'Pacientes CRM', value: String(patients.length), icon: Users, trend: '+0%' },
-    { title: 'Pré Pacientes', value: String(prePatients.length), icon: Activity, trend: '+0%' },
-    { title: 'Taxa de Ocupação', value: '—', icon: TrendingUp, trend: '+0%' },
+    {
+      title: 'Pacientes CRM',
+      value: String(metrics.pacientesCRM),
+      icon: Users,
+      trend: metrics.calculateTrend(metrics.pacientesCRMMesAtual, metrics.pacientesCRMMesAnterior),
+      description: 'novos este mês'
+    },
+    {
+      title: 'Pré Pacientes',
+      value: String(metrics.prePatientes),
+      icon: Activity,
+      trend: '—',
+      description: 'aguardando conversão'
+    },
+    {
+      title: 'Equipe Médica',
+      value: String(metrics.totalMedicos),
+      icon: Stethoscope,
+      trend: metrics.totalSecretarias > 0 ? `+${metrics.totalSecretarias} sec.` : '—',
+      description: 'médicos ativos'
+    },
   ];
 
   return (
@@ -49,12 +60,14 @@ export default function Dashboard() {
                 <div className="text-sm font-medium text-muted-foreground">{stat.title}</div>
                 <stat.icon className="w-4 h-4 text-primary" />
               </div>
-              <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+              <div className="text-3xl font-bold text-foreground">
+                {metrics.loading ? '...' : stat.value}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                <span className={String(stat.trend).startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                <span className={String(stat.trend).startsWith('+') ? 'text-green-500' : String(stat.trend).startsWith('-') ? 'text-red-500' : 'text-muted-foreground'}>
                   {stat.trend}
                 </span>{' '}
-                vs. mês passado
+                {stat.description}
               </p>
             </MagicBentoCard>
           ))}

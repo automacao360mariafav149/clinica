@@ -66,15 +66,9 @@ async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
         console.error('[AuthContext] ⚠️⚠️⚠️ QUERY DEU TIMEOUT! Possível problema de RLS ou conexão lenta.');
         console.error('[AuthContext] 💡 DICA: Verifique as políticas RLS da tabela profiles no Supabase');
         
-        // Retorna usuário básico para permitir login mesmo com erro
-        console.warn('[AuthContext] 🚨 Retornando usuário com dados básicos para permitir login');
-        return {
-          id: supaUser.id,
-          auth_id: supaUser.id,
-          email: supaUser.email || '',
-          name: supaUser.email || 'Usuário',
-          role: 'doctor' as UserRole,
-        };
+        // REMOVIDO: Não retornar dados básicos, lançar erro
+        console.error('[AuthContext] ❌ Lançando erro - não é permitido login com dados básicos');
+        throw new Error('Timeout ao buscar perfil do usuário. Por favor, tente novamente.');
       }
       
       // Verifica se é erro de rate limit
@@ -129,14 +123,8 @@ async function mapSupabaseUserToAppUser(supaUser: SupabaseUser): Promise<User> {
       console.error('[AuthContext] ❌ ERRO: Sistema sobrecarregado. Por favor, aguarde alguns segundos e tente novamente.');
     }
     
-    // Fallback completo em caso de erro
-    return {
-      id: supaUser.id,
-      auth_id: supaUser.id,
-      email: supaUser.email || '',
-      name: supaUser.email || 'Usuário',
-      role: 'doctor' as UserRole,
-    };
+    // REMOVIDO: Fallback - lançar erro em vez de retornar dados básicos
+    throw error;
   }
 }
 

@@ -13,14 +13,20 @@ interface AgentConsultation {
   cid_description: string | null;
 }
 
+interface MedicalRecord {
+  chief_complaint: string | null;
+  diagnosis: string | null;
+}
+
 export function DiseaseTreemapCard() {
   const { data: appointments } = useRealtimeList<Appointment>({ table: 'appointments' });
   const { data: agentConsultations } = useRealtimeList<AgentConsultation>({
     table: 'agent_consultations',
   });
+  const { data: medicalRecords } = useRealtimeList<MedicalRecord>({ table: 'medical_records' });
 
   const diseaseStats = useMemo(() => {
-    const diseaseCounts: Record<string, { count: number; type: 'cid' | 'reason' }> = {};
+    const diseaseCounts: Record<string, { count: number; type: 'cid' | 'reason' | 'chief_complaint' | 'diagnosis' }> = {};
 
     // Adicionar CIDs das consultas de agente
     agentConsultations.forEach((consultation) => {
@@ -43,6 +49,22 @@ export function DiseaseTreemapCard() {
       }
     });
 
+    // TAMBÉM buscar de medical_records (chief_complaint e diagnosis)
+    medicalRecords.forEach((record) => {
+      if (record.chief_complaint) {
+        if (!diseaseCounts[record.chief_complaint]) {
+          diseaseCounts[record.chief_complaint] = { count: 0, type: 'chief_complaint' };
+        }
+        diseaseCounts[record.chief_complaint].count++;
+      }
+      if (record.diagnosis) {
+        if (!diseaseCounts[record.diagnosis]) {
+          diseaseCounts[record.diagnosis] = { count: 0, type: 'diagnosis' };
+        }
+        diseaseCounts[record.diagnosis].count++;
+      }
+    });
+
     return Object.entries(diseaseCounts)
       .map(([name, data]) => ({
         name: name.length > 40 ? name.substring(0, 37) + '...' : name,
@@ -52,7 +74,7 @@ export function DiseaseTreemapCard() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 12);
-  }, [appointments, agentConsultations]);
+  }, [appointments, agentConsultations, medicalRecords]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -63,7 +85,10 @@ export function DiseaseTreemapCard() {
             <span className="font-semibold">{payload[0].value}</span> ocorrência(s)
           </p>
           <p className="text-muted-foreground text-xs mt-1">
-            {payload[0].payload.type === 'cid' ? '📋 Diagnóstico CID' : '🩺 Motivo Consulta'}
+            {payload[0].payload.type === 'cid' ? '📋 Diagnóstico CID' : 
+             payload[0].payload.type === 'diagnosis' ? '🏥 Diagnóstico' :
+             payload[0].payload.type === 'chief_complaint' ? '🩺 Queixa Principal' :
+             '📝 Motivo Consulta'}
           </p>
         </div>
       );
