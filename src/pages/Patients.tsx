@@ -144,6 +144,12 @@ export default function Patients() {
     }
   };
 
+  const isValidDate = (dateString?: string | null): boolean => {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date.getTime());
+  };
+
   const formatWhatsappToDDDNumber = (raw?: string | null) => {
     if (!raw) return '-';
     const atIdx = raw.indexOf('@');
@@ -249,7 +255,7 @@ export default function Patients() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {patient.next_appointment_date ? (
+                      {patient.next_appointment_date && isValidDate(patient.next_appointment_date) ? (
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
                           <span className="text-sm">
