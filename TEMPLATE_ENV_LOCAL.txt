@@ -42,8 +42,8 @@ VITE_ENABLE_COMPONENT_TAGGER=false
 # EXEMPLO PREENCHIDO:
 # ============================================================
 #
-# VITE_SUPABASE_URL=https://xyzabc123.supabase.co
-# VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+# VITE_SUPABASE_URL=https://lmzphqdrrbulmytddsek.supabase.co
+# VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtenBocWRycmJ1bG15dGRkc2VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4ODEwMTMsImV4cCI6MjA3NzQ1NzAxM30.yd2ePuRBi0CNvTF0oNgNrzBDdGg1kxiXu9cHaR-D_k0
 # VITE_ENABLE_COMPONENT_TAGGER=false
 #
 # ============================================================

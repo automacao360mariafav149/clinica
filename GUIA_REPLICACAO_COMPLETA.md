@@ -40,9 +40,9 @@ Antes de começar, certifique-se de ter:
 1. No dashboard do seu projeto, vá em **Settings** → **API**
 2. Anote os seguintes valores:
    ```
-   Project URL: https://[seu-project-ref].supabase.co
-   API Key (anon/public): eyJhb...
-   Project Ref: [seu-project-ref]
+   Project URL: https://lmzphqdrrbulmytddsek.supabase.co
+   API Key (anon/public): eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtenBocWRycmJ1bG15dGRkc2VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4ODEwMTMsImV4cCI6MjA3NzQ1NzAxM30.yd2ePuRBi0CNvTF0oNgNrzBDdGg1kxiXu9cHaR-D_k0
+   Project Ref: lmzphqdrrbulmytddsek
    ```
 
 ---
@@ -70,12 +70,10 @@ bun install
 
 2. Edite o arquivo `.env.local` com suas credenciais:
    ```env
-   VITE_SUPABASE_URL=https://[seu-project-ref].supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhb...
-   
+   VITE_SUPABASE_URL=https://lmzphqdrrbulmytddsek.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxtenBocWRycmJ1bG15dGRkc2VrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4ODEwMTMsImV4cCI6MjA3NzQ1NzAxM30.yd2ePuRBi0CNvTF0oNgNrzBDdGg1kxiXu9cHaR-D_k0
    # Opcional - Para features de IA
-   VITE_GEMINI_API_KEY=sua-chave-gemini-aqui
-   ```
+   VITE_GEMINI_API_KEY=sAIzaSyCo_vyfXytvUuRwthPsqxVJaVLOLF2DiRs
 
 3. Salve o arquivo
 
